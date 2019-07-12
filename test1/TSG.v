@@ -127,7 +127,7 @@ Definition fmap
 
 (** Grammar representation *)
 Record Grammar := mkGram
-  { ruleSet : list rule (* TODO: use a real set data type? *)
+  { rule_set : list rule (* TODO: use a real set data type? *)
       (* The set of grammar production rules *)
   ; label : node -> symbol
       (* node labeling function *)
@@ -149,7 +149,7 @@ Record Grammar := mkGram
 (* Chart items and the rules to infer them. *)
 Inductive item : dotted_rule -> pos -> pos -> Prop :=
   | axiom (g : Grammar) (r : rule) (i : pos)
-      (I: In r (ruleSet g))
+      (I: In r (rule_set g))
       (L: i <= term_max g) :
         item r i i
   | scan (g : Grammar) (r : rule) (i : pos) (j : pos)
