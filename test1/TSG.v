@@ -87,6 +87,14 @@ Definition shift (r : rule) : rule :=
   end.
 
 
+(* Shift the dot in the rule (if possible) *)
+Definition shift' (r : rule) : option (node * rule) :=
+  match r with
+  | Rule x (h :: t) => Some (h, Rule x t)
+  | _ => None
+  end.
+
+
 (** We just assume that the dot is in front of the body.
     In a dotted rule, the body may not contain all the
     symbols in the actualy body of the rule, just the
@@ -125,10 +133,22 @@ Definition fmap
   | Some v => Some (f v)
   end.
 
-(** Grammar representation *)
+
+(** Ultimately, should have a full-fledged set representation.
+*)
+Definition set := list.
+
+
+(** Grammar representation
+
+TODO: there are many implicit assumptions not encoded in the record
+type below.  For example, that the node arguments of the inidivudal 
+functions actually belong to the grammar.
+
+*)
 Record Grammar := mkGram
-  { rule_set : list rule (* TODO: use a real set data type? *)
-      (* The set of grammar production rules *)
+  { rule_set : set rule
+      (* the set of grammar production rules *)
   ; label : node -> symbol
       (* node labeling function *)
   ; term_max: nat
@@ -137,37 +157,82 @@ Record Grammar := mkGram
       (* is the given node a root of an ET? *)
   ; leaf : node -> bool
       (* is the given node a leaf of an ET? *)
+  ; tree_weight : node -> weight
+      (* weight of the ET containing the given node *)
+  ; anchor : node -> terminal
+      (* anchor terminal of the ET containing the given node *)
+  ; arc_weight : terminal -> terminal -> weight
+      (* weight of the given (dependency, head) arc *)
+
+  ; inf : node -> set terminal
+      (* the set of terminals under and in the given node. *)
+  ; sup : node -> set terminal
+      (* the set of terminals over the given node. *)
+  ; inf_plus_sup :
+      forall n : node,
+        inf n ++ sup n = [anchor n]
+      (* we assume that there is a single anchor in each ET;
+         hence, the set of inferior plus the set of superior
+         nodes should contain this unique anchor. *)
+
+  ; inf' : dotted_rule -> set terminal
+  ; sup' : dotted_rule -> set terminal
+  ; inf_plus_sup' :
+      forall r : dotted_rule,
+        inf' r ++ sup' r = [anchor (head r)]
   }.
 
-(*
- ; Rat_bottom_cond : 0 <> bottom
- ; Rat_irred_cond :
-     forall x y z:nat, (x * y) = top /\ (x * z) = bottom -> x = 1
- }.
-*)
 
-(* Chart items and the rules to infer them. *)
-Inductive item : dotted_rule -> pos -> pos -> Prop :=
+(** Weight of the given (dependent, head) arc +
+    weight of the dependent ET
+*)
+Definition omega (g : Grammar) (dep gov : node) : weight :=
+  arc_weight g (anchor g dep) (anchor g gov) +
+  tree_weight g dep.
+
+
+(** The minimal cost of scanning the given terminal *)
+Definition cost (g : Grammar) (t : terminal) : weight :=
+  0. (* TODO: the real cost *)
+
+
+(** The minimal cost of scanning the given set of terminals *)
+Definition costs (g : Grammar) (ts : set terminal) : weight :=
+  fold_left plus (map (cost g) ts) 0.
+
+
+Lemma sup_shift : forall (g : Grammar) (r : rule),
+  match shift' r with
+  | None => True
+  | Some (h, r') =>
+      costs g (sup' g r) = costs g (sup' g r') - costs g (inf g h)
+  end.
+Proof.
+Admitted.
+
+
+(** Chart items and the rules to infer them. *)
+Inductive item : dotted_rule -> pos -> pos -> weight -> Prop :=
   | axiom (g : Grammar) (r : rule) (i : pos)
       (I: In r (rule_set g))
       (L: i <= term_max g) :
-        item r i i
-  | scan (g : Grammar) (r : rule) (i : pos) (j : pos)
-      (P: item r i j)
+        item r i i 0
+  | scan (g : Grammar) (r : rule) (i : pos) (j : pos) (w : weight)
+      (P: item r i j w)
       (L: j <= term_max g)
       (E: fmap (label g) (lead r) = Some (term j)) :
-        item r i (S j)
-  | pseudo_subst (g : Grammar) (l : rule) (r : rule) (i j k : pos)
-      (LP: item l i j)
-      (RP: item r j k)
+        item r i (S j) w
+  | pseudo_subst (g : Grammar) (l r : rule) (i j k : pos) (w1 w2 : weight)
+      (LP: item l i j w1)
+      (RP: item r j k w2)
       (L: body r = [])
       (E: lead l = Some (head r)) :
-        item (shift l) i k
-  | subst (g : Grammar) (l : rule) (r : rule) (i j k : pos)
-      (LP: item l i j)
-      (RP: item r j k)
+        item (shift l) i k (w1 + w2)
+  | subst (g : Grammar) (l : rule) (r : rule) (i j k : pos) (w1 w2 : weight)
+      (LP: item l i j w1)
+      (RP: item r j k w2)
       (L1: body r = [])
       (L2: root g (head r) = true)
       (L3: fmap (leaf g) (lead l) = Some true)
       (E: fmap (label g) (lead l) = Some (label g (head r))) :
-        item (shift l) i k.
+        item (shift l) i k (w1 + w2 + omega g (head r) (head l)).
