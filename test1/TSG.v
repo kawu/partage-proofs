@@ -182,11 +182,9 @@ Record Grammar := mkGram
         inf' r ++ sup' r = [anchor (head r)]
   }.
 
-
 (** Weight of the ET with the given rule *)
 Definition rule_weight (g : Grammar) (r : rule) : weight :=
   tree_weight g (head r).
-
 
 (** Weight of the given (dependent, head) arc +
     weight of the dependent ET
@@ -194,7 +192,6 @@ Definition rule_weight (g : Grammar) (r : rule) : weight :=
 Definition omega (g : Grammar) (dep gov : node) : weight :=
   arc_weight g (anchor g dep) (anchor g gov) +
   tree_weight g dep.
-
 
 (** Minimum nat *)
 Fixpoint minimum (xs : list nat) : option nat :=
@@ -207,7 +204,6 @@ Fixpoint minimum (xs : list nat) : option nat :=
     end
   end.
 
-
 (** Weight of the ET with the given rule, provided that it contains
     the given terminal anchor terminal. *)
 Definition rule_with_term_weight
@@ -216,17 +212,12 @@ Definition rule_with_term_weight
   then Some (rule_weight g r)
   else None.
 
-
 Fixpoint cat_maybes {A : Type} (l : list (option A)) : list A :=
   match l with
   | [] => []
   | Some h :: t => h :: cat_maybes t
   | None :: t => cat_maybes t
   end.
-
-
-Check map.
-
 
 (** The minimal cost of scanning the given terminal *)
 Definition cost (g : Grammar) (t : terminal) : weight :=
@@ -235,30 +226,83 @@ Definition cost (g : Grammar) (t : terminal) : weight :=
   | Some x => x
   end.
 
-
 (** The minimal cost of scanning the given set of terminals *)
 Definition costs (g : Grammar) (ts : set terminal) : weight :=
   fold_left plus (map (cost g) ts) 0.
 
-
-Lemma sup_shift : forall (g : Grammar) (r : rule),
-  match shift' r with
-  | None => True
-  | Some (h, r') =>
-      costs g (sup' g r) = costs g (sup' g r') - costs g (inf g h)
-  end.
+Lemma head_inf_sup_eq : forall (g : Grammar) (r r' : rule),
+  head r' = head r ->
+    inf' g r' ++ sup' g r' = inf' g r ++ sup' g r.
 Proof.
-  intros g r.
-  destruct r as [hd bd].
-  induction bd.
-  - (* [] *)
-    simpl. apply I.
-  - (* a :: bd *)
-    simpl. simpl in IHbd.
-    destruct bd as [|bd1 bds] eqn:E.
-    + unfold sup'.
+  intros g r r'. intros H.
+  rewrite inf_plus_sup'. rewrite inf_plus_sup'. rewrite H. reflexivity.
+Qed.
+
+Lemma shift_inf : forall (g : Grammar) (r r' : rule) (v : node),
+  shift' r' = Some (v, r) ->
+    inf' g r' ++ inf g v = inf' g r.
+Proof.
 Admitted.
 
+About app_comm_cons.
+
+Lemma app_pref_eq : forall {A : Type} (l l' pref : list A),
+  pref ++ l = pref ++ l' -> l = l'.
+Proof.
+  intros A l l' pref.
+  induction pref as [|h t].
+  - simpl. intros H. apply H.
+  - intros H. rewrite <- app_comm_cons in H. rewrite <- app_comm_cons in H.
+    injection H as H. apply IHt in H. apply H.
+Qed.
+
+Lemma shift'_preserves_head : forall (r r' : rule) (v : node),
+  shift' r = Some (v, r') -> head r = head r'.
+Proof.
+Admitted.
+
+Lemma shift_sup : forall (g : Grammar) (r' : rule),
+  match shift' r' with
+  | None => True
+  | Some (v, r) => sup' g r' = inf g v ++ sup' g r
+  end.
+Proof.
+  intros g r'.
+  destruct (shift' r') as [(v, r)|] eqn:E.
+  - apply app_pref_eq with (pref := inf' g r').
+    rewrite app_assoc.
+    rewrite shift_inf with (r := r).
+    + apply head_inf_sup_eq.
+      apply shift'_preserves_head with (v := v). apply E.
+    + apply E.
+  - apply I.
+Qed.
+
+Lemma shift_sup' : forall (g : Grammar) (r r' : rule) (v : node),
+  shift' r' = Some (v, r) ->
+    sup' g r' = inf g v ++ sup' g r.
+Proof.
+Admitted.
+
+Lemma costs_app : forall (g : Grammar) (ts ts' : set terminal),
+  costs g (ts ++ ts') = costs g ts + costs g ts'.
+Proof.
+Admitted.
+
+Lemma shift_cost_sup : forall (g : Grammar) (r' : rule),
+  match shift' r' with
+  | None => True
+  | Some (v, r) =>
+      costs g (sup' g r') = costs g (inf g v) + costs g (sup' g r)
+  end.
+Proof.
+  intros g r'.
+  destruct (shift' r') as [(v, r)|] eqn:E.
+  - rewrite shift_sup' with (r := r) (v := v).
+    + rewrite <- costs_app. apply f_equal. reflexivity.
+    + apply E.
+  - apply I.
+Qed.
 
 (** Chart items and the rules to infer them. *)
 Inductive item : dotted_rule -> pos -> pos -> weight -> Prop :=
