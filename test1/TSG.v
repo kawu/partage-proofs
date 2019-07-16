@@ -244,8 +244,6 @@ Lemma shift_inf : forall (g : Grammar) (r r' : rule) (v : node),
 Proof.
 Admitted.
 
-About app_comm_cons.
-
 Lemma app_pref_eq : forall {A : Type} (l l' pref : list A),
   pref ++ l = pref ++ l' -> l = l'.
 Proof.
@@ -259,7 +257,13 @@ Qed.
 Lemma shift'_preserves_head : forall (r r' : rule) (v : node),
   shift' r = Some (v, r') -> head r = head r'.
 Proof.
-Admitted.
+  intros r r' v H.
+  unfold shift' in H.
+  destruct r as [rh [|rbh rbt]] eqn:E.
+  - discriminate H.
+  - injection H as H1 H2. simpl.
+    rewrite <- H2. simpl. reflexivity.
+Qed.
 
 Lemma shift_sup : forall (g : Grammar) (r' : rule),
   match shift' r' with
@@ -282,12 +286,45 @@ Lemma shift_sup' : forall (g : Grammar) (r r' : rule) (v : node),
   shift' r' = Some (v, r) ->
     sup' g r' = inf g v ++ sup' g r.
 Proof.
-Admitted.
+  intros g r r' v H.
+  destruct (shift' r') as [(v', r'')|] eqn:E.
+  - apply app_pref_eq with (pref := inf' g r').
+    rewrite app_assoc.
+    rewrite shift_inf with (r := r).
+    + apply head_inf_sup_eq.
+      apply shift'_preserves_head with (v := v).
+      rewrite E. apply H.
+    + rewrite E. apply H.
+  - discriminate H.
+Qed.
+
+Lemma fold_left_plus : forall (x : nat) (l : list nat),
+  fold_left plus l x = fold_left plus l 0 + x.
+Proof.
+  intros x l.
+  generalize dependent x.
+  induction l as [|h t IH].
+  - intros x. simpl. reflexivity.
+  - intros x. simpl. rewrite IH.
+    rewrite (IH h). rewrite <- plus_assoc.
+    rewrite (plus_comm x h). reflexivity.
+Qed.
 
 Lemma costs_app : forall (g : Grammar) (ts ts' : set terminal),
   costs g (ts ++ ts') = costs g ts + costs g ts'.
 Proof.
-Admitted.
+  intros g ts ts'.
+  generalize dependent ts'.
+  induction ts as [|tsh tst IH].
+  - intros ts'. simpl. reflexivity.
+  - intros ts'. rewrite <- app_comm_cons.
+    unfold costs. simpl.
+    unfold costs in IH.
+    rewrite fold_left_plus. rewrite (fold_left_plus (cost g tsh)).
+    rewrite IH. rewrite <- plus_assoc.
+    rewrite (plus_comm _ (cost _ _)).
+    rewrite plus_assoc. reflexivity.
+Qed.
 
 Lemma shift_cost_sup : forall (g : Grammar) (r' : rule),
   match shift' r' with
