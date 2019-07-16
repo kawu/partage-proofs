@@ -142,8 +142,8 @@ Definition set := list.
 (** Grammar representation
 
 TODO: there are many implicit assumptions not encoded in the record
-type below.  For example, that the node arguments of the inidivudal 
-functions actually belong to the grammar.
+type below.  For example, that the node arguments of the inidivudal
+functions actually belong to the grammar.  Is that a problem?
 
 *)
 Record Grammar := mkGram
@@ -173,7 +173,7 @@ Record Grammar := mkGram
         inf n ++ sup n = [anchor n]
       (* we assume that there is a single anchor in each ET;
          hence, the set of inferior plus the set of superior
-         nodes should contain this unique anchor. *)
+         nodes will always contain this unique anchor. *)
 
   ; inf' : dotted_rule -> set terminal
   ; sup' : dotted_rule -> set terminal
