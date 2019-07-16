@@ -183,6 +183,11 @@ Record Grammar := mkGram
   }.
 
 
+(** Weight of the ET with the given rule *)
+Definition rule_weight (g : Grammar) (r : rule) : weight :=
+  tree_weight g (head r).
+
+
 (** Weight of the given (dependent, head) arc +
     weight of the dependent ET
 *)
@@ -191,9 +196,44 @@ Definition omega (g : Grammar) (dep gov : node) : weight :=
   tree_weight g dep.
 
 
+(** Minimum nat *)
+Fixpoint minimum (xs : list nat) : option nat :=
+  match xs with
+  | [] => None
+  | x :: t =>
+    match minimum t with
+    | None => Some x
+    | Some y => Some (min x y)
+    end
+  end.
+
+
+(** Weight of the ET with the given rule, provided that it contains
+    the given terminal anchor terminal. *)
+Definition rule_with_term_weight
+    (g : Grammar) (t : terminal) (r : rule) : option weight :=
+  if anchor g (head r) =? t
+  then Some (rule_weight g r)
+  else None.
+
+
+Fixpoint cat_maybes {A : Type} (l : list (option A)) : list A :=
+  match l with
+  | [] => []
+  | Some h :: t => h :: cat_maybes t
+  | None :: t => cat_maybes t
+  end.
+
+
+Check map.
+
+
 (** The minimal cost of scanning the given terminal *)
 Definition cost (g : Grammar) (t : terminal) : weight :=
-  0. (* TODO: the real cost *)
+  match minimum (cat_maybes (map (rule_with_term_weight g t) (rule_set g))) with
+  | None => 0
+  | Some x => x
+  end.
 
 
 (** The minimal cost of scanning the given set of terminals *)
@@ -208,6 +248,15 @@ Lemma sup_shift : forall (g : Grammar) (r : rule),
       costs g (sup' g r) = costs g (sup' g r') - costs g (inf g h)
   end.
 Proof.
+  intros g r.
+  destruct r as [hd bd].
+  induction bd.
+  - (* [] *)
+    simpl. apply I.
+  - (* a :: bd *)
+    simpl. simpl in IHbd.
+    destruct bd as [|bd1 bds] eqn:E.
+    + unfold sup'.
 Admitted.
 
 
