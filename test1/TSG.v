@@ -65,9 +65,9 @@ Inductive symbol {nt t} : Type :=
   | non_term (x : nt)
   | terminal (x : t).
 
+(*
 Inductive rule {v : Type} :=
   | Rule (head : v) (body : list v).
-
 
 Definition head {v : Type} (r : @rule v) : v :=
   match r with
@@ -79,7 +79,6 @@ Definition body {v : Type} (r : @rule v) : list v :=
   | Rule x y => y
   end.
 
-(*
 (* Leading symbol in the body of the rule *)
 Definition lead (r : rule) : option node :=
   match r with
@@ -286,6 +285,13 @@ Definition shift {vt nt}
       end
   end.
 
+Definition lead {vt nt}
+    (g : @Grammar vt nt) (r : vt*nat) : option vt :=
+  match shift g r with
+  | Some (v, _) => Some v
+  | None => None
+  end.
+
 Axiom shift_inf : forall {vt nt}
     (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
   shift g r' = Some (v, r) ->
@@ -406,27 +412,33 @@ Proof.
 Qed.
 
 (** Chart items and the rules to infer them. *)
-Inductive item : dotted_rule -> pos -> pos -> weight -> Prop :=
-  | axiom (g : Grammar) (r : rule) (i : pos)
-      (I: In r (rule_set g))
+Inductive item {vt nt} : vt*nat -> term -> term -> weight -> Prop :=
+  | axiom (g : @Grammar vt nt) (r : vt*nat) (i : term)
+      (I: In r (rules g))
       (L: i <= term_max g) :
         item r i i 0
-  | scan (g : Grammar) (r : rule) (i : pos) (j : pos) (w : weight)
+  | scan (g : @Grammar vt nt) (r : vt*nat) (i : term) (j : term) (w : weight)
       (P: item r i j w)
       (L: j <= term_max g)
-      (E: fmap (label g) (lead r) = Some (term j)) :
+      (E: fmap (label g) (lead g r) = Some (terminal j)) :
         item r i (S j) w
-  | pseudo_subst (g : Grammar) (l r : rule) (i j k : pos) (w1 w2 : weight)
+  | pseudo_subst
+      (g : @Grammar vt nt) (l r l' : vt*nat) (i j k : term) (w1 w2 : weight)
       (LP: item l i j w1)
       (RP: item r j k w2)
-      (L: body r = [])
-      (E: lead l = Some (head r)) :
-        item (shift l) i k (w1 + w2)
-  | subst (g : Grammar) (l : rule) (r : rule) (i j k : pos) (w1 w2 : weight)
+      (L: shift g r = None)
+      (E: shift g l = Some (fst r, l')) :
+        item l' i k (w1 + w2)
+  | subst
+      (g : @Grammar vt nt) (l r l' : vt*nat) (i j k : term) (v : vt) (w1 w2 : weight)
       (LP: item l i j w1)
       (RP: item r j k w2)
-      (L1: body r = [])
-      (L2: root g (head r) = true)
-      (L3: fmap (leaf g) (lead l) = Some true)
-      (E: fmap (label g) (lead l) = Some (label g (head r))) :
-        item (shift l) i k (w1 + w2 + omega g (head r) (head l)).
+      (L1: shift g r = None)
+      (L2: root g (fst r) = true)
+      (L3: shift g l = Some (v, l'))
+      (L4: leaf g v = true)
+      (E: label g v = label g (fst r)) :
+        item l' i k (w1 + w2 + omega g (fst r) (fst l)).
+
+
+
