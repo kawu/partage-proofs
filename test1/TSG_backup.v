@@ -35,51 +35,42 @@ From Coq Require Import Logic.FunctionalExtensionality.
 From Coq Require Import Lists.List.
 Import ListNotations.
 
-(* From LF Require Import Maps. *)
+From LF Require Import Maps.
 
-Fixpoint cat_maybes {A : Type} (l : list (option A)) : list A :=
-  match l with
-  | [] => []
-  | Some h :: t => h :: cat_maybes t
-  | None :: t => cat_maybes t
-  end.
-
-Definition map_maybe {A B : Type} (f : A -> option B) (l : list A) : list B :=
-  cat_maybes (map f l).
-
-Fixpoint drop {A : Type} (k : nat) (l : list A) : list A :=
-  match k, l with
-  | 0, _ => l
-  | _, _ :: t => drop (k-1) t
-  | _, [] => []
-  end.
 
 (** Tree Substitution Grammar parser, 1st try.
 *)
 
 
-(** Termina (position) in the input sentence *)
-Definition term := nat.
-
-Inductive symbol {nt t} : Type :=
-  | non_term (x : nt)
-  | terminal (x : t).
-
-Inductive rule {v : Type} :=
-  | Rule (head : v) (body : list v).
+Definition non_terminal := string.
+Definition terminal := nat.
 
 
-Definition head {v : Type} (r : @rule v) : v :=
+Inductive symbol : Type :=
+  | non_term (x : non_terminal)
+  | term (x : terminal).
+
+
+(** Node.  Eventually, should be constrained to a closed, predefined set.
+*)
+Definition node := nat.
+
+Inductive rule : Type :=
+  | Rule (head : node) (body : list node).
+
+
+Definition head (r : rule) : node :=
   match r with
   | Rule x y => x
   end.
 
-Definition body {v : Type} (r : @rule v) : list v :=
+
+Definition body (r : rule) : list node :=
   match r with
   | Rule x y => y
   end.
 
-(*
+
 (* Leading symbol in the body of the rule *)
 Definition lead (r : rule) : option node :=
   match r with
@@ -87,25 +78,52 @@ Definition lead (r : rule) : option node :=
   | _ => None
   end.
 
+
 (* Shift the dot in the rule (if possible) *)
 Definition shift (r : rule) : rule :=
   match r with
   | Rule x (h :: t) => Rule x t
   | _ => r
   end.
-*)
 
-(*
+
 (* Shift the dot in the rule (if possible) *)
-Definition shift {v : Type} (r : @rule v) : option (v * @rule v) :=
+Definition shift' (r : rule) : option (node * rule) :=
   match r with
   | Rule x (h :: t) => Some (h, Rule x t)
   | _ => None
   end.
+
+
+(** We just assume that the dot is in front of the body.
+    In a dotted rule, the body may not contain all the
+    symbols in the actualy body of the rule, just the
+    symbols that are still to be matched. 
 *)
+Definition dotted_rule := rule.
+
+(** Position in the input sentence.
+*)
+Definition pos := nat.
 
 (* Weight; eventually should be represented by a real number? *)
 Definition weight := nat.
+
+(* Weight map assinging weights to slots in the input sentence. *)
+Definition wmap := partial_map (weight*weight).
+
+(*
+Definition apply
+  {A B : Type} (f : A -> option B) (x : option A) : option B :=
+  match x with
+  | None => None
+  | Some v => 
+    match f v with
+    | None => None
+    | Some v' => Some v'
+    end
+  end.
+*)
 
 (* fmap for an option *)
 Definition fmap
@@ -114,6 +132,12 @@ Definition fmap
   | None => None
   | Some v => Some (f v)
   end.
+
+
+(** Ultimately, should have a full-fledged set representation.
+*)
+Definition set := list.
+
 
 (** Grammar representation.
 
@@ -134,40 +158,118 @@ grammars in general, it should also hold for a grammar with all
 the well-formedness constraints satisfied.
 
 *)
-Record Grammar {vert non_term : Type} := mkGram
-  { vertices : list vert
-      (* the list (=>set) of vertices in the grammar *)
-  ; terminals : list term
-      (* the list (=>set) of terminals in the grammar *)
+(* Record Grammar := mkGram
+  { term_set : set terminal
+      (* the set of grammar terminals *)
+  ; node_set : set node
+      (* the set of grammar nodes *)
+  ; rule_set : set rule
+      (* the set of grammar production rules *)
+  ; dotted_set : set dotted_rule
+      (* the set of grammar dotted rules *)
+
+  ; label : node -> symbol
+      (* node labeling function *)
+  ; term_max: terminal
+      (* the last terminal (position) in the sentence *)
+  ; root : node -> bool
+      (* is the given node a root of an ET? *)
+  ; leaf : node -> bool
+      (* is the given node a leaf of an ET? *)
+  ; tree_weight : node -> weight
+      (* weight of the ET containing the given node *)
+  ; anchor : node -> terminal
+      (* anchor terminal of the ET containing the given node *)
+  ; arc_weight : terminal -> terminal -> weight
+      (* weight of the given (dependency, head) arc *)
+
+  ; rule_is_dotted :
+      forall r : rule, In r rule_set ->
+        In r dotted_set
+      (* each production rule is also a dotted rule *)
+  ; shift_preserves_dotted :
+      forall (r r' : dotted_rule) (v : node),
+        In r' dotted_set ->
+        shift' r' = Some (v, r) ->
+          In r dotted_set
+      (* if we perform shift, we still get a dotted rule *)
+
+  ; inf : node -> set terminal
+      (* the set of terminals under and in the given node. *)
+  ; sup : node -> set terminal
+      (* the set of terminals over the given node. *)
+  ; inf_plus_sup :
+      forall n : node, In n node_set ->
+        inf n ++ sup n = [anchor n]
+      (* We assume that there is a single anchor in each ET;
+         hence, the set of inferior plus the set of superior
+         nodes will always contain this unique anchor.
+
+         NOTE: what follows not true anymore!
+
+         Without loss of generality we assume that this property
+         holds for nodes outside of [node_set]. Otherwise, we
+         would have to add [In n node_set] as a premise and
+         the proofs would be slightly more troublesome.
+      *)
+
+  ; inf' : dotted_rule -> set terminal
+  ; sup' : dotted_rule -> set terminal
+  ; inf_plus_sup' :
+      forall r : dotted_rule, In r dotted_set ->
+        inf' r ++ sup' r = [anchor (head r)]
+  }. *)
+
+Record Grammar vert term := mkGram
+  {
+
+(*
+    term_set : set terminal
+      (* the set of grammar terminals *)
+  ; node_set : set node
+      (* the set of grammar nodes *)
+*)
+  ; rule_set : set rule
+      (* the set of grammar production rules *)
+  ; dotted_set : set dotted_rule
+      (* the set of grammar dotted rules *)
+
+    label : vert -> symbol
+      (* node labeling function *)
+
+(*
+  ; term_max: t
+      (* the last terminal (position) in the sentence *)
+*)
 
   ; root : vert -> bool
       (* is the given node a root of an ET? *)
   ; leaf : vert -> bool
       (* is the given node a leaf of an ET? *)
+  ; tree_weight : vert -> weight
+      (* weight of the ET containing the given node *)
   ; anchor : vert -> term
       (* anchor terminal of the ET containing the given node *)
-  ; label : vert -> @symbol non_term term
-      (* node labeling function *)
-
-  ; term_max: term
-      (* the last position in the sentence *)
-
-  ; parent : vert -> option vert
-      (* parent of the given vertex (root => None) *)
-  ; children : vert -> list vert
-      (* the list of children of the given vertex (leaf => nil) *)
+  ; arc_weight : term -> term -> weight
+      (* weight of the given (dependency, head) arc *)
 
 (*
-  ; rule_for : vert -> @rule vert
-      (* production rule for the given vertex 
-         NOTE: returns a trivial rule for a leaf; we don't
-         use such rules our inference system! (but we could...) *)
+  ; rule_is_dotted :
+      forall r : rule, In r rule_set ->
+        In r dotted_set
+      (* each production rule is also a dotted rule *)
+  ; shift_preserves_dotted :
+      forall (r r' : dotted_rule) (v : node),
+        In r' dotted_set ->
+        shift' r' = Some (v, r) ->
+          In r dotted_set
+      (* if we perform shift, we still get a dotted rule *)
 *)
 
-  ; inf : vert -> list term
-      (* the list (=>set) of terminals under and in the given node. *)
-  ; sup : vert -> list term
-      (* the list (=>set) of terminals over the given node. *)
+  ; inf : vert -> set term
+      (* the set of terminals under and in the given node. *)
+  ; sup : vert -> set term
+      (* the set of terminals over the given node. *)
   ; inf_plus_sup :
       forall n : vert,
         inf n ++ sup n = [anchor n]
@@ -175,53 +277,23 @@ Record Grammar {vert non_term : Type} := mkGram
          hence, the set of inferior plus the set of superior
          nodes will always contain this unique anchor. *)
 
-  ; inf' : vert * nat -> list term
-      (* the list (=>set) of the processed terminals after
-         traversing (at most) the give number of children,
-         from left to right. *)
-  ; sup' : vert * nat -> list term
-      (* the list (=>set) of the terminals remaining to match after
-         traversing (at most) the give number of children,
-         from left to right. *)
+(*
+  ; inf' : dotted_rule -> set terminal
+  ; sup' : dotted_rule -> set terminal
   ; inf_plus_sup' :
-      forall (r : vert * nat),
-        inf' r ++ sup' r = [anchor (fst r)]
-
-  ; tree_weight : vert -> weight
-      (* weight of the ET containing the given node *)
-
-  ; arc_weight : term -> term -> weight
-      (* weight of the given (dependency, head) arc *)
-
+      forall r : dotted_rule, In r dotted_set ->
+        inf' r ++ sup' r = [anchor (head r)]
+*)
   }.
 
-(** The list (=>set) of production rules in the grammar *)
-Definition rules {vt nt} (g : @Grammar vt nt) : list (vt*nat) :=
-  let
-    f v :=
-      if leaf g v
-      then None
-      else Some (v, 0)
-  in
-    map_maybe f (vertices g).
-
-(*
 (** Weight of the ET with the given rule *)
-Definition rule_weight {vt nt}
-  (g : @Grammar vt nt) (r : @rule vt) : weight :=
-    tree_weight g (head r).
-*)
-
-(** Weight of the ET with the given rule *)
-Definition rule_weight {vt nt}
-    (g : @Grammar vt nt) (r : vt * nat) : weight :=
-  tree_weight g (fst r).
+Definition rule_weight (g : Grammar) (r : rule) : weight :=
+  tree_weight g (head r).
 
 (** Weight of the given (dependent, head) arc +
     weight of the dependent ET
 *)
-Definition omega {vt nt}
-    (g : @Grammar vt nt) (dep gov : vt) : weight :=
+Definition omega (g : Grammar) (dep gov : node) : weight :=
   arc_weight g (anchor g dep) (anchor g gov) +
   tree_weight g dep.
 
@@ -237,59 +309,57 @@ Fixpoint minimum (xs : list nat) : option nat :=
   end.
 
 (** Minimal arc weight for the given dependent *)
-Definition min_arc_weight {vt nt}
-    (g : @Grammar vt nt) (dep : term) : weight :=
-  match minimum (map (arc_weight g dep) (terminals g)) with
+Definition min_arc_weight (g : Grammar) (dep : terminal) : weight :=
+  match minimum (map (arc_weight g dep) (term_set g)) with
   | None => 0
   | Some x => x
   end.
 
 (** Weight of the ET with the given rule, provided that it contains
     the given terminal anchor terminal. *)
-Definition rule_with_term_weight {vt nt}
-    (g : @Grammar vt nt) (t : term) (r : vt * nat) : option weight :=
-  if anchor g (fst r) =? t
+Definition rule_with_term_weight
+    (g : Grammar) (t : terminal) (r : rule) : option weight :=
+  if anchor g (head r) =? t
   then Some (rule_weight g r)
   else None.
 
+Fixpoint cat_maybes {A : Type} (l : list (option A)) : list A :=
+  match l with
+  | [] => []
+  | Some h :: t => h :: cat_maybes t
+  | None :: t => cat_maybes t
+  end.
+
 (** The minimal cost of scanning the given terminal *)
-Definition cost {vt nt}
-    (g : @Grammar vt nt) (t : term) : weight :=
-  match minimum (cat_maybes (map (rule_with_term_weight g t) (rules g))) with
+Definition cost (g : Grammar) (t : terminal) : weight :=
+  match minimum (cat_maybes (map (rule_with_term_weight g t) (rule_set g))) with
   | None => 0
   | Some x => x
   end.
 
-(** The minimal cost of scanning the given list of terminals *)
-Definition costs {vt nt}
-    (g : @Grammar vt nt) (ts : list term) : weight :=
+(** The minimal cost of scanning the given set of terminals *)
+Definition costs (g : Grammar) (ts : set terminal) : weight :=
   fold_left plus (map (cost g) ts) 0.
 
-Lemma head_inf_sup_eq : forall {vt nt}
-    (g : @Grammar vt nt) (r r' : vt * nat),
-  fst r' = fst r ->
+Lemma head_inf_sup_eq : forall (g : Grammar) (r r' : rule),
+  In r (dotted_set g) ->
+  In r' (dotted_set g) ->
+  head r' = head r ->
     inf' g r' ++ sup' g r' = inf' g r ++ sup' g r.
 Proof.
-  intros vt nt g r r'. intros H.
+  intros g r r'. intros H0 H1 H2.
   rewrite inf_plus_sup'.
-  rewrite inf_plus_sup'.
-  rewrite H. reflexivity.
+  - rewrite inf_plus_sup'.
+    + rewrite H2. reflexivity.
+    + apply H0.
+  - apply H1.
 Qed.
 
-Definition shift {vt nt}
-    (g : @Grammar vt nt) (r : vt*nat) : option (vt * (vt*nat)) :=
-  match r with
-  | (v, k) =>
-      match drop k (children g v) with
-      | v' :: t => Some (v', (v, k+1))
-      | [] => None
-      end
-  end.
-
-Axiom shift_inf : forall {vt nt}
-    (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
-  shift g r' = Some (v, r) ->
+Lemma shift_inf : forall (g : Grammar) (r r' : rule) (v : node),
+  shift' r' = Some (v, r) ->
     inf' g r' ++ inf g v = inf' g r.
+Proof.
+Admitted.
 
 Lemma app_pref_eq : forall {A : Type} (l l' pref : list A),
   pref ++ l = pref ++ l' -> l = l'.
@@ -301,30 +371,46 @@ Proof.
     injection H as H. apply IHt in H. apply H.
 Qed.
 
-Lemma shift_preserves_head : forall {vt nt}
-    (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
-  shift g r = Some (v, r') -> fst r = fst r'.
+Lemma shift'_preserves_head : forall (r r' : rule) (v : node),
+  shift' r = Some (v, r') -> head r = head r'.
 Proof.
-  intros vt nt g [v k] [v' k'] v'' H.
-  simpl.
-  unfold shift in H.
-  destruct (drop k (children g v)) eqn:E.
+  intros r r' v H.
+  unfold shift' in H.
+  destruct r as [rh [|rbh rbt]] eqn:E.
   - discriminate H.
-  - injection H. intros _ H' _. apply H'.
+  - injection H as H1 H2. simpl.
+    rewrite <- H2. simpl. reflexivity.
 Qed.
 
-Lemma shift_sup : forall {vt nt}
-    (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
-  shift g r' = Some (v, r) ->
-    sup' g r' = inf g v ++ sup' g r.
+(*
+Lemma shift_sup : forall (g : Grammar) (r' : rule),
+  match shift' r' with
+  | None => True
+  | Some (v, r) => sup' g r' = inf g v ++ sup' g r
+  end.
 Proof.
-  intros vt nt g r r' w H.
-  destruct (shift g r') as [r''|] eqn:E.
+  intros g r'.
+  destruct (shift' r') as [(v, r)|] eqn:E.
   - apply app_pref_eq with (pref := inf' g r').
     rewrite app_assoc.
-    rewrite shift_inf with (r0 := r).
+    rewrite shift_inf with (r := r).
     + apply head_inf_sup_eq.
-      apply shift_preserves_head with (g0 := g) (v := w).
+      apply shift'_preserves_head with (v := v). apply E.
+    + apply E.
+  - apply I.
+Qed. *)
+
+Lemma shift_sup : forall (g : Grammar) (r r' : rule) (v : node),
+  shift' r' = Some (v, r) ->
+    sup' g r' = inf g v ++ sup' g r.
+Proof.
+  intros g r r' v H.
+  destruct (shift' r') as [(v', r'')|] eqn:E.
+  - apply app_pref_eq with (pref := inf' g r').
+    rewrite app_assoc.
+    rewrite shift_inf with (r := r).
+    + apply head_inf_sup_eq.
+      apply shift'_preserves_head with (v := v).
       rewrite E. apply H.
     + rewrite E. apply H.
   - discriminate H.
@@ -342,11 +428,10 @@ Proof.
     rewrite (plus_comm x h). reflexivity.
 Qed.
 
-Lemma costs_app : forall {vt nt}
-    (g : @Grammar vt nt) (ts ts' : list term),
+Lemma costs_app : forall (g : Grammar) (ts ts' : set terminal),
   costs g (ts ++ ts') = costs g ts + costs g ts'.
 Proof.
-  intros vt nt g ts ts'.
+  intros g ts ts'.
   generalize dependent ts'.
   induction ts as [|tsh tst IH].
   - intros ts'. simpl. reflexivity.
@@ -359,26 +444,41 @@ Proof.
     rewrite plus_assoc. reflexivity.
 Qed.
 
-Lemma shift_cost_sup : forall {vt nt}
-    (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
-  shift g r' = Some (v, r) ->
+(*
+Lemma shift_cost_sup : forall (g : Grammar) (r' : rule),
+  match shift' r' with
+  | None => True
+  | Some (v, r) =>
+      costs g (sup' g r') = costs g (inf g v) + costs g (sup' g r)
+  end.
+Proof.
+  intros g r'.
+  destruct (shift' r') as [(v, r)|] eqn:E.
+  - rewrite shift_sup with (r := r) (v := v).
+    + rewrite <- costs_app. apply f_equal. reflexivity.
+    + apply E.
+  - apply I.
+Qed. *)
+
+Lemma shift_cost_sup : forall (g : Grammar) (r r' : rule) (v : node),
+  shift' r' = Some (v, r) ->
     costs g (sup' g r') = costs g (inf g v) + costs g (sup' g r).
 Proof.
-  intros vt nt g r r' v H.
-  destruct (shift g r') as [(v', r'')|] eqn:E.
-  - rewrite shift_sup with (r0 := r) (v0 := v).
+  intros g r r' v H.
+  destruct (shift' r') as [(v', r'')|] eqn:E.
+  - rewrite shift_sup with (r := r) (v := v).
     + rewrite <- costs_app. apply f_equal. reflexivity.
     + rewrite <- H. apply E.
   - discriminate H.
 Qed.
 
 (** Amortized weight of the given parsing configuration *)
-Definition amort_weight {vt nt} (g : @Grammar vt nt) (n : vt) : weight :=
+Definition amort_weight (g : Grammar) (n : node) : weight :=
   tree_weight g n + min_arc_weight g (anchor g n) - costs g (sup g n).
 
 (** Amortized weight of the given parsing configuration *)
-Definition amort_weight' {vt nt} (g : @Grammar vt nt) (r : vt*nat) : weight :=
-  let n := fst r
+Definition amort_weight' (g : Grammar) (r : dotted_rule) : weight :=
+  let n := head r
   in tree_weight g n + min_arc_weight g (anchor g n) - costs g (sup' g r).
 
 Lemma minus_plus : forall x y z, (x - y) + z = x + (z - y).
@@ -389,14 +489,13 @@ Lemma plus_minus : forall x y z, z + (x - (x + y)) = z - y.
 Proof.
 Admitted.
 
-Lemma shift_amort_weight : forall {vt nt}
-    (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
-  shift g r' = Some (v, r) ->
+Lemma shift_amort_weight : forall (g : Grammar) (r r' : rule) (v : node),
+  shift' r' = Some (v, r) ->
     amort_weight' g r = amort_weight' g r' + costs g (inf g v).
 Proof.
-  intros vt nt g r r' v H.
+  intros g r r' v H.
   unfold amort_weight'.
-  apply shift_preserves_head in H as H'.
+  apply shift'_preserves_head in H as H'.
   rewrite H'.
   (* Unset Printing Notations. *)
   rewrite minus_plus.
