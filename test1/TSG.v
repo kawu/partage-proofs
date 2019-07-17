@@ -147,7 +147,9 @@ functions actually belong to the grammar.  Is that a problem?
 
 *)
 Record Grammar := mkGram
-  { rule_set : set rule
+  { term_set : set terminal
+      (* the set of grammar terminals *)
+  ; rule_set : set rule
       (* the set of grammar production rules *)
   ; label : node -> symbol
       (* node labeling function *)
@@ -202,6 +204,13 @@ Fixpoint minimum (xs : list nat) : option nat :=
     | None => Some x
     | Some y => Some (min x y)
     end
+  end.
+
+(** Minimal arc weight for the given dependent *)
+Definition min_arc_weight (g : Grammar) (dep : terminal) : weight :=
+  match minimum (map (arc_weight g dep) (term_set g)) with
+  | None => 0
+  | Some x => x
   end.
 
 (** Weight of the ET with the given rule, provided that it contains
@@ -265,6 +274,7 @@ Proof.
     rewrite <- H2. simpl. reflexivity.
 Qed.
 
+(*
 Lemma shift_sup : forall (g : Grammar) (r' : rule),
   match shift' r' with
   | None => True
@@ -280,9 +290,9 @@ Proof.
       apply shift'_preserves_head with (v := v). apply E.
     + apply E.
   - apply I.
-Qed.
+Qed. *)
 
-Lemma shift_sup' : forall (g : Grammar) (r r' : rule) (v : node),
+Lemma shift_sup : forall (g : Grammar) (r r' : rule) (v : node),
   shift' r' = Some (v, r) ->
     sup' g r' = inf g v ++ sup' g r.
 Proof.
@@ -326,6 +336,7 @@ Proof.
     rewrite plus_assoc. reflexivity.
 Qed.
 
+(*
 Lemma shift_cost_sup : forall (g : Grammar) (r' : rule),
   match shift' r' with
   | None => True
@@ -335,10 +346,53 @@ Lemma shift_cost_sup : forall (g : Grammar) (r' : rule),
 Proof.
   intros g r'.
   destruct (shift' r') as [(v, r)|] eqn:E.
-  - rewrite shift_sup' with (r := r) (v := v).
+  - rewrite shift_sup with (r := r) (v := v).
     + rewrite <- costs_app. apply f_equal. reflexivity.
     + apply E.
   - apply I.
+Qed. *)
+
+Lemma shift_cost_sup : forall (g : Grammar) (r r' : rule) (v : node),
+  shift' r' = Some (v, r) ->
+    costs g (sup' g r') = costs g (inf g v) + costs g (sup' g r).
+Proof.
+  intros g r r' v H.
+  destruct (shift' r') as [(v', r'')|] eqn:E.
+  - rewrite shift_sup with (r := r) (v := v).
+    + rewrite <- costs_app. apply f_equal. reflexivity.
+    + rewrite <- H. apply E.
+  - discriminate H.
+Qed.
+
+(** Amortized weight of the given parsing configuration *)
+Definition amort_weight (g : Grammar) (n : node) : weight :=
+  tree_weight g n + min_arc_weight g (anchor g n) - costs g (sup g n).
+
+(** Amortized weight of the given parsing configuration *)
+Definition amort_weight' (g : Grammar) (r : dotted_rule) : weight :=
+  let n := head r
+  in tree_weight g n + min_arc_weight g (anchor g n) - costs g (sup' g r).
+
+Lemma minus_plus : forall x y z, (x - y) + z = x + (z - y).
+Proof.
+Admitted.
+
+Lemma plus_minus : forall x y z, z + (x - (x + y)) = z - y.
+Proof.
+Admitted.
+
+Lemma shift_amort_weight : forall (g : Grammar) (r r' : rule) (v : node),
+  shift' r' = Some (v, r) ->
+    amort_weight' g r = amort_weight' g r' + costs g (inf g v).
+Proof.
+  intros g r r' v H.
+  unfold amort_weight'.
+  apply shift'_preserves_head in H as H'.
+  rewrite H'.
+  rewrite minus_plus.
+  rewrite (shift_cost_sup g r r') with (v := v).
+  - rewrite plus_minus. reflexivity.
+  - apply H.
 Qed.
 
 (** Chart items and the rules to infer them. *)
