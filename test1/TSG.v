@@ -54,6 +54,28 @@ Fixpoint drop {A : Type} (k : nat) (l : list A) : list A :=
   | _, [] => []
   end.
 
+(** Minimum nat *)
+Fixpoint minimum (xs : list nat) : option nat :=
+  match xs with
+  | [] => None
+  | x :: t =>
+    match minimum t with
+    | None => Some x
+    | Some y => Some (min x y)
+    end
+  end.
+
+(** Maximum nat *)
+Fixpoint maximum (xs : list nat) : option nat :=
+  match xs with
+  | [] => None
+  | x :: t =>
+    match maximum t with
+    | None => Some x
+    | Some y => Some (max x y)
+    end
+  end.
+
 (** Tree Substitution Grammar parser, 1st try.
 *)
 
@@ -139,6 +161,10 @@ Record Grammar {vert non_term : Type} := mkGram
   ; terminals : list term
       (* the list (=>set) of terminals in the grammar *)
 
+  ; term_max : term
+      (* the last position in the sentence *)
+  ; term_max_correct : maximum terminals = Some term_max
+
   ; root : vert -> bool
       (* is the given node a root of an ET? *)
   ; leaf : vert -> bool
@@ -147,9 +173,6 @@ Record Grammar {vert non_term : Type} := mkGram
       (* anchor terminal of the ET containing the given node *)
   ; label : vert -> @symbol non_term term
       (* node labeling function *)
-
-  ; term_max: term
-      (* the last position in the sentence *)
 
   ; parent : vert -> option vert
       (* parent of the given vertex (root => None) *)
@@ -205,11 +228,14 @@ Definition rules {vt nt} (g : @Grammar vt nt) : list (vt*nat) :=
     map_maybe f (vertices g).
 
 (*
-(** Weight of the ET with the given rule *)
-Definition rule_weight {vt nt}
-  (g : @Grammar vt nt) (r : @rule vt) : weight :=
-    tree_weight g (head r).
+(** The last position in the sentence *)
+Definition term_max {vt nt} (g : @Grammar vt nt) : term :=
+  match maximum (terminals g) with
+  | None => 0 (* WARNING: this should never happen! *)
+  | Some x => x
+  end.
 *)
+
 
 (** Weight of the ET with the given rule *)
 Definition rule_weight {vt nt}
@@ -223,17 +249,6 @@ Definition omega {vt nt}
     (g : @Grammar vt nt) (dep gov : vt) : weight :=
   arc_weight g (anchor g dep) (anchor g gov) +
   tree_weight g dep.
-
-(** Minimum nat *)
-Fixpoint minimum (xs : list nat) : option nat :=
-  match xs with
-  | [] => None
-  | x :: t =>
-    match minimum t with
-    | None => Some x
-    | Some y => Some (min x y)
-    end
-  end.
 
 (** Minimal arc weight for the given dependent *)
 Definition min_arc_weight {vt nt}
@@ -294,8 +309,8 @@ Definition lead {vt nt}
 
 Axiom shift_inf : forall {vt nt}
     (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
-  shift g r' = Some (v, r) ->
-    inf' g r' ++ inf g v = inf' g r.
+  shift g r = Some (v, r') ->
+    inf' g r ++ inf g v = inf' g r'.
 
 Lemma app_pref_eq : forall {A : Type} (l l' pref : list A),
   pref ++ l = pref ++ l' -> l = l'.
@@ -328,7 +343,7 @@ Proof.
   destruct (shift g r') as [r''|] eqn:E.
   - apply app_pref_eq with (pref := inf' g r').
     rewrite app_assoc.
-    rewrite shift_inf with (r0 := r).
+    rewrite shift_inf with (r'0 := r).
     + apply head_inf_sup_eq.
       apply shift_preserves_head with (g0 := g) (v := w).
       rewrite E. apply H.
