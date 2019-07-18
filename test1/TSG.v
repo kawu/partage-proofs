@@ -426,34 +426,68 @@ Proof.
   - apply H.
 Qed.
 
+(** The list (=>set) of terminals inside the given span *)
+Definition in_span {vt nt}
+  (g : @Grammar vt nt) (i j : term) : list term
+  :=
+  [].
+
+(** The list (=>set) of terminals outside of the given span *)
+(** TODO: rename as [out] at some point *)
+Definition rest {vt nt}
+  (g : @Grammar vt nt) (i j : term) : list term
+  :=
+  [].
+
+Definition heuristic {vt nt}
+  (g : @Grammar vt nt) (r : vt*nat) (i j : term) : weight
+  :=
+  amort_weight' g r + costs g (rest g i j).
+
 (** Chart items and the rules to infer them. *)
-Inductive item {vt nt} : vt*nat -> term -> term -> weight -> Prop :=
+Inductive item {vt nt} 
+  : vt*nat -> term -> term -> weight
+           -> weight (* value of the heuristic *)
+           -> weight (* previous max total value *)
+           -> Prop :=
   | axiom (g : @Grammar vt nt) (r : vt*nat) (i : term)
       (I: In r (rules g))
       (L: i <= term_max g) :
-        item r i i 0
-  | scan (g : @Grammar vt nt) (r : vt*nat) (i : term) (j : term) (w : weight)
-      (P: item r i j w)
+        item r i i 0 (heuristic g r i i) 0
+  | scan (g : @Grammar vt nt) (r : vt*nat) (i : term) (j : term) (w h _t : weight)
+      (P: item r i j w h _t)
       (L: j <= term_max g)
       (E: fmap (label g) (lead g r) = Some (terminal j)) :
-        item r i (S j) w
+        item r i (S j) w (heuristic g r i (S j)) 0
   | pseudo_subst
-      (g : @Grammar vt nt) (l r l' : vt*nat) (i j k : term) (w1 w2 : weight)
-      (LP: item l i j w1)
-      (RP: item r j k w2)
+      (g : @Grammar vt nt) (l r l' : vt*nat) (i j k : term) (w1 w2 h1 h2 _t1 _t2 : weight)
+      (LP: item l i j w1 h1 _t1)
+      (RP: item r j k w2 h2 _t2)
       (L: shift g r = None)
       (E: shift g l = Some (fst r, l')) :
-        item l' i k (w1 + w2)
+        item l' i k (w1 + w2) (heuristic g l' i k) 0
   | subst
-      (g : @Grammar vt nt) (l r l' : vt*nat) (i j k : term) (v : vt) (w1 w2 : weight)
-      (LP: item l i j w1)
-      (RP: item r j k w2)
+      (g : @Grammar vt nt) (l r l' : vt*nat) (i j k : term) (v : vt)
+      (w1 w2 h1 h2 _t1 _t2 : weight)
+      (LP: item l i j w1 h1 _t1)
+      (RP: item r j k w2 h2 _t2)
       (L1: shift g r = None)
       (L2: root g (fst r) = true)
       (L3: shift g l = Some (v, l'))
       (L4: leaf g v = true)
       (E: label g v = label g (fst r)) :
-        item l' i k (w1 + w2 + omega g (fst r) (fst l)).
+        item l' i k (w1 + w2 + omega g (fst r) (fst l)) (heuristic g l' i k) 0.
 
 
+Theorem in_vs_inside : forall {vt nt} r i j w h t
+  (g : @Grammar vt nt) (H: @item vt nt r i j w h t),
+    costs g (in_span g i j) <= w + costs g (inf g r).
+Proof.
+Admitted.
 
+
+Theorem monotonic : forall {vt nt} r i j w h t
+  (g : @Grammar vt nt) (H: @item vt nt r i j w h t),
+    t <= w + h.
+Proof.
+Admitted.
