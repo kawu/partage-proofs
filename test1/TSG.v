@@ -84,8 +84,8 @@ Fixpoint maximum (xs : list nat) : option nat :=
 Definition term := nat.
 
 Inductive symbol {nt t} : Type :=
-  | non_term (x : nt)
-  | terminal (x : t).
+  | NonTerm (x : nt)
+  | Terminal (x : t).
 
 (*
 Inductive rule {v : Type} :=
@@ -164,6 +164,7 @@ Record Grammar {vert non_term : Type} := mkGram
   ; term_max : term
       (* the last position in the sentence *)
   ; term_max_correct : maximum terminals = Some term_max
+  ; term_min_correct : minimum terminals = Some 0
 
   ; root : vert -> bool
       (* is the given node a root of an ET? *)
@@ -312,6 +313,28 @@ Axiom shift_inf : forall {vt nt}
   shift g r = Some (v, r') ->
     inf' g r ++ inf g v = inf' g r'.
 
+Lemma inf_passive : forall {vt nt} (g : @Grammar vt nt) r,
+  shift g r = None -> 
+    inf' g r = inf g (fst r).
+Proof.
+Admitted.
+
+(*
+Lemma shift_inf : forall {vt nt} (g : @Grammar vt nt) l l' r,
+  shift g r = None ->
+  shift g l = Some (fst r, l') ->
+    inf' g l' = inf' g l ++ inf' g r.
+Proof.
+Admitted.
+*)
+
+Lemma shift_term_inf : forall {vt nt} (g : @Grammar vt nt) r r' v i,
+  shift g r = Some (v, r') ->
+  label g v = Terminal i ->
+    inf' g r' = inf' g r ++ [i].
+Proof.
+Admitted.
+
 Lemma app_pref_eq : forall {A : Type} (l l' pref : list A),
   pref ++ l = pref ++ l' -> l = l'.
 Proof.
@@ -427,64 +450,158 @@ Proof.
 Qed.
 
 (** The list (=>set) of terminals inside the given span *)
-Definition in_span {vt nt}
-  (g : @Grammar vt nt) (i j : term) : list term
-  :=
-  [].
+Fixpoint in_span (i j : term) : list term :=
+  match j with
+  | 0 => []
+  | S j' =>
+    if i <=? j'
+    then j' :: in_span i j'
+    else []
+  end.
+
+Lemma not_S_i_leb_i : forall (i : term), (S i <=? i = false).
+Proof.
+  intros i.
+  induction i as [|i' IH].
+  - simpl. reflexivity.
+  - simpl in IH. simpl. apply IH.
+Qed.
+
+Lemma in_span_ii_empty : forall (i : term),
+  in_span i i = [].
+Proof.
+  intros i.
+  unfold in_span.
+  destruct i as [|i'].
+  - reflexivity.
+  - destruct (S i' <=? i') eqn:E.
+    + rewrite not_S_i_leb_i in E. discriminate E.
+    + reflexivity.
+Qed.
+
+Theorem in_span_Sj : forall i j : term,
+  i <= j -> in_span i (S j) = in_span i j ++ [j].
+Proof.
+Admitted.
 
 (** The list (=>set) of terminals outside of the given span *)
 (** TODO: rename as [out] at some point *)
-Definition rest {vt nt}
-  (g : @Grammar vt nt) (i j : term) : list term
-  :=
-  [].
+Definition rest {vt nt} (g : @Grammar vt nt) (i j : term) : list term :=
+  in_span 0 (i - 1) ++ in_span (j + 1) (term_max g).
+
 
 Definition heuristic {vt nt}
-  (g : @Grammar vt nt) (r : vt*nat) (i j : term) : weight
-  :=
-  amort_weight' g r + costs g (rest g i j).
+  (g : @Grammar vt nt) (r : vt*nat) (i j : term) : weight :=
+    amort_weight' g r + costs g (rest g i j).
 
 (** Chart items and the rules to infer them. *)
 Inductive item {vt nt} 
-  : vt*nat -> term -> term -> weight
+  : @Grammar vt nt
+           -> vt*nat -> term -> term -> weight
            -> weight (* value of the heuristic *)
            -> weight (* previous max total value *)
            -> Prop :=
   | axiom (g : @Grammar vt nt) (r : vt*nat) (i : term)
       (I: In r (rules g))
       (L: i <= term_max g) :
-        item r i i 0 (heuristic g r i i) 0
-  | scan (g : @Grammar vt nt) (r : vt*nat) (i : term) (j : term) (w h _t : weight)
-      (P: item r i j w h _t)
+        item g r i i 0 (heuristic g r i i) 0
+  | scan (g : @Grammar vt nt)
+      (r r' : vt*nat) (i : term) (j : term) (v : vt) (w h _t : weight)
+      (P: item g r i j w h _t)
       (L: j <= term_max g)
-      (E: fmap (label g) (lead g r) = Some (terminal j)) :
-        item r i (S j) w (heuristic g r i (S j)) 0
+      (* (E: fmap (label g) (lead g r) = Some (terminal j)) : *)
+      (E1: shift g r = Some (v, r'))
+      (E2: label g v = Terminal j) :
+        item g r' i (S j) w (heuristic g r' i (S j)) 0
   | pseudo_subst
       (g : @Grammar vt nt) (l r l' : vt*nat) (i j k : term) (w1 w2 h1 h2 _t1 _t2 : weight)
-      (LP: item l i j w1 h1 _t1)
-      (RP: item r j k w2 h2 _t2)
+      (LP: item g l i j w1 h1 _t1)
+      (RP: item g r j k w2 h2 _t2)
       (L: shift g r = None)
       (E: shift g l = Some (fst r, l')) :
-        item l' i k (w1 + w2) (heuristic g l' i k) 0
+        item g l' i k (w1 + w2) (heuristic g l' i k) 0
   | subst
       (g : @Grammar vt nt) (l r l' : vt*nat) (i j k : term) (v : vt)
       (w1 w2 h1 h2 _t1 _t2 : weight)
-      (LP: item l i j w1 h1 _t1)
-      (RP: item r j k w2 h2 _t2)
+      (LP: item g l i j w1 h1 _t1)
+      (RP: item g r j k w2 h2 _t2)
       (L1: shift g r = None)
       (L2: root g (fst r) = true)
       (L3: shift g l = Some (v, l'))
       (L4: leaf g v = true)
       (E: label g v = label g (fst r)) :
-        item l' i k (w1 + w2 + omega g (fst r) (fst l)) (heuristic g l' i k) 0.
+        item g l' i k (w1 + w2 + omega g (fst r) (fst l)) (heuristic g l' i k) 0.
 
+Theorem i_leb_j : forall {vt nt} r i j w h t
+  (g : @Grammar vt nt) (H: @item vt nt g r i j w h t),
+    i <= j.
+Proof.
+  intros vt nt r i j w h t g.
+  intros eta.
+  induction eta
+    as [ g r' i' I L
+       | g r1 r2 i' j' v w' h' _t' P IHP L E1 E2
+       | | ].
+  - reflexivity.
+  - 
+Admitted.
 
-Theorem in_vs_inside : forall {vt nt} r i j w h t
-  (g : @Grammar vt nt) (H: @item vt nt r i j w h t),
-    costs g (in_span g i j) <= w + costs g (inf g r).
+Lemma plus_leq : forall (x y z : nat),
+  x <= y -> x + z <= y + z.
+Proof. Admitted.
+
+Lemma combine_leq : forall x1 y1 x2 y2 : nat,
+  x1 <= y1 ->
+  x2 <= y2 ->
+    x1 + x2 <= y1 + y2.
 Proof.
 Admitted.
 
+Lemma in_span_split : forall i j k,
+  in_span i k = in_span i j ++ in_span j k.
+Proof.
+Admitted.
+
+About plus_assoc.
+
+Theorem in_vs_inside : forall {vt nt} r i j w h t
+  (g : @Grammar vt nt) (H: @item vt nt g r i j w h t),
+    costs g (in_span i j) <= w + costs g (inf' g r).
+Proof.
+  intros vt nt r i j w h t g.
+  intros eta.
+  induction eta
+    as [ g r' i' I L
+       | g r1 r2 i' j' v w' h' _t' P IHP L E1 E2
+       | g l r' l' i' j' k w1 w2 h1 h2 _t1 _t2 LP IHL RP IHP L E
+       |
+       ].
+  - simpl. rewrite in_span_ii_empty.
+    unfold costs. simpl. apply le_0_n.
+  - rewrite in_span_Sj.
+    Focus 2. apply (i_leb_j r1 i' j' w' h' _t' g). apply P.
+    rewrite (shift_term_inf g r1 r2 v j').
+    + rewrite costs_app. rewrite costs_app.
+      rewrite plus_assoc.
+      apply (plus_leq _ _ (costs g [j'])).
+      apply IHP.
+    + apply E1.
+    + apply E2.
+  - rewrite (in_span_split i' j' k).
+    rewrite costs_app.
+    apply shift_inf in E as E'.
+    rewrite <- E'. rewrite costs_app.
+    rewrite (plus_assoc (w1 + w2)).
+    rewrite (plus_assoc_reverse w1).
+    rewrite (plus_comm w2).
+    rewrite (plus_assoc).
+    rewrite (plus_assoc_reverse (w1 + costs g (inf' g l))).
+    apply (combine_leq _ (w1 + costs g (inf' g l))).
+    + apply IHL.
+    + apply inf_passive in L as L'.
+      rewrite <- L'. apply IHP.
+  -
+Admitted.
 
 Theorem monotonic : forall {vt nt} r i j w h t
   (g : @Grammar vt nt) (H: @item vt nt r i j w h t),
