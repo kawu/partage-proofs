@@ -574,7 +574,7 @@ Proof.
     as [ g r' i' I L
        | g r1 r2 i' j' v w' h' _t' P IHP L E1 E2
        | g l r' l' i' j' k w1 w2 h1 h2 _t1 _t2 LP IHL RP IHP L E
-       |
+       | g l r l' i j k v w1 w2 h1 h2 _t1 _t2 LP IHL RP IHP L1 L2 L3 L4 E
        ].
   - simpl. rewrite in_span_ii_empty.
     unfold costs. simpl. apply le_0_n.
@@ -600,8 +600,48 @@ Proof.
     + apply IHL.
     + apply inf_passive in L as L'.
       rewrite <- L'. apply IHP.
-  -
+  - 
 Admitted.
+
+(* We know that:
+
+  costs g (in_span i k) <= w1 + w2 + costs g (inf' g l) + costs g (inf' g r)
+
+We thus need to show that:
+
+  costs g (inf' g l) + costs g (inf' g r)
+    <= omega g (fst r) (fst l) + costs g (inf' g l')
+
+* [costs g (inf' g l)] is the minimal cost of what we have matched so far
+  in the active item.
+* [costs g (inf' g r)] is the minimal cost of the entire ET
+  corresponding to [r].
+* [costs g (inf' g l') = costs g (inf' g l)] because we shift over a
+  non-terminal leaf.
+
+Given the third point, it's enough to show that:
+
+  costs g (inf' g r) <= omega g (fst r) (fst l)
+
+given the definition of [omega]:
+
+  Definition omega {vt nt}
+      (g : @Grammar vt nt) (dep gov : vt) : weight :=
+    arc_weight g (anchor g dep) (anchor g gov) +
+    tree_weight g dep.
+
+Now, let's try to solve this in our particular case of singly-lexicalized grammar.
+In this setting, we know that 
+
+  inf' g r = [anchor (fst r)]
+
+Therefore, the LHS is simply the minimal (dep+ET) cost of the anchor
+corresponding to [r].
+
+The RHS, on the other hand, is *the actual* dep+ET cost.  So this should
+hold indeed!
+
+*)
 
 Theorem monotonic : forall {vt nt} r i j w h t
   (g : @Grammar vt nt) (H: @item vt nt r i j w h t),
