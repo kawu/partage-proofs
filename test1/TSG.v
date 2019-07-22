@@ -335,6 +335,14 @@ Lemma shift_term_inf : forall {vt nt} (g : @Grammar vt nt) r r' v i,
 Proof.
 Admitted.
 
+Lemma shift_non_term_leaf_inf : forall {vt nt} (g : @Grammar vt nt) r r' v x,
+  shift g r = Some (v, r') ->
+  leaf g v = true ->
+  label g v = NonTerm x ->
+    inf' g r' = inf' g r.
+Proof.
+Admitted.
+
 Lemma app_pref_eq : forall {A : Type} (l l' pref : list A),
   pref ++ l = pref ++ l' -> l = l'.
 Proof.
@@ -562,7 +570,25 @@ Lemma in_span_split : forall i j k,
 Proof.
 Admitted.
 
-About plus_assoc.
+Lemma inf_cost_vs_omega : forall {vt nt} (g : @Grammar vt nt) (v w : vt),
+  root g v = true ->
+    costs g (inf g v) <= omega g v w.
+Proof.
+Admitted.
+
+Lemma inf_cost_vs_omega' :
+  forall {vt nt} (g : @Grammar vt nt) (r : vt*nat) (w : vt),
+    shift g r = None ->
+    root g (fst r) = true ->
+      costs g (inf' g r) <= omega g (fst r) w.
+Proof.
+Admitted.
+
+Lemma root_has_non_term : forall {vt nt} (g : @Grammar vt nt) v,
+  root g v = true ->
+    exists x, label g v = NonTerm x.
+Proof.
+Admitted.
 
 Theorem in_vs_inside : forall {vt nt} r i j w h t
   (g : @Grammar vt nt) (H: @item vt nt g r i j w h t),
@@ -600,8 +626,37 @@ Proof.
     + apply IHL.
     + apply inf_passive in L as L'.
       rewrite <- L'. apply IHP.
-  - 
-Admitted.
+  - rewrite (in_span_split i j k).
+    rewrite costs_app.
+    rewrite plus_comm.
+    rewrite (plus_comm w1).
+    rewrite (plus_assoc_reverse w2).
+    rewrite (plus_comm w1).
+    rewrite (plus_assoc).
+    rewrite (plus_assoc_reverse (w2 + omega g (fst r) (fst l))).
+    apply (combine_leq _ (w2 + omega g (fst r) (fst l))).
+    + transitivity (w2 + costs g (inf' g r)).
+      * apply IHP.
+      * rewrite (plus_comm w2). rewrite (plus_comm w2).
+        apply plus_leq.
+        apply (inf_cost_vs_omega' g r (fst l)).
+        { apply L1. } { apply L2. }
+    + apply root_has_non_term in L2 as L2'.
+      destruct L2' as [x L2'].
+      rewrite (shift_non_term_leaf_inf g l l' v x).
+      * apply IHL.
+      * apply L3.
+      * apply L4.
+      * rewrite L2' in E. apply E.
+Qed.
+
+(*
+Lemma shift_non_term_leaf_inf : forall {vt nt} (g : @Grammar vt nt) r r' v x,
+  shift g r = Some (v, r') ->
+  leaf g v = true ->
+  label g v = NonTerm x ->
+    inf' g r' = inf' g r.
+*)
 
 (* We know that:
 
