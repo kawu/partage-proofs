@@ -330,6 +330,31 @@ Record Grammar {vert non_term : Type} := mkGram
         min_arc_weight dep <= arc_weight dep hed
       (* minimal ET weight smaller than others *)
 
+  ; shift : vert * nat -> option (vert * (vert * nat))
+      (* shift the dot *)
+
+  (* various shift-related properties *)
+  ; shift_preserves_head : forall r r' v,
+      shift r = Some (v, r') ->
+        fst r = fst r'
+  ; shift_inf : forall r r' v,
+      shift r = Some (v, r') ->
+        inf' r ++ inf v = inf' r'
+  ; shift_inf_passive : forall r,
+      shift r = None ->
+        inf' r = inf (fst r)
+  ; shift_term_inf : forall r r' v i,
+      shift r = Some (v, r') ->
+      label v = Terminal i ->
+        inf' r' = inf' r ++ [i]
+  ; shift_non_term_leaf_inf : forall r r' v x,
+      shift r = Some (v, r') ->
+      leaf v = true ->
+      label v = NonTerm x ->
+        inf' r' = inf' r
+  ; no_shift_inf : forall r,
+      shift r = None ->
+        inf' r = inf (fst r)
   }.
 
 (** The list (=>set) of production rules in the grammar *)
@@ -404,6 +429,7 @@ Proof.
   rewrite H. reflexivity.
 Qed.
 
+(*
 Definition shift {vt nt}
     (g : @Grammar vt nt) (r : vt*nat) : option (vt * (vt*nat)) :=
   match r with
@@ -413,6 +439,7 @@ Definition shift {vt nt}
       | [] => None
       end
   end.
+*)
 
 Definition lead {vt nt}
     (g : @Grammar vt nt) (r : vt*nat) : option vt :=
@@ -421,12 +448,13 @@ Definition lead {vt nt}
   | None => None
   end.
 
+(*
 Axiom shift_inf : forall {vt nt}
     (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
   shift g r = Some (v, r') ->
     inf' g r ++ inf g v = inf' g r'.
 
-Lemma inf_passive : forall {vt nt} (g : @Grammar vt nt) r,
+Lemma shift_inf_passive : forall {vt nt} (g : @Grammar vt nt) r,
   shift g r = None -> 
     inf' g r = inf g (fst r).
 Proof.
@@ -453,12 +481,15 @@ Lemma shift_non_term_leaf_inf : forall {vt nt} (g : @Grammar vt nt) r r' v x,
 Proof.
 Admitted.
 
+
 Lemma no_shift_inf : forall {vt nt} (g : @Grammar vt nt) r,
   shift g r = None ->
     inf' g r = inf g (fst r).
 Proof.
 Admitted.
+*)
 
+(*
 Lemma shift_preserves_head : forall {vt nt}
     (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
   shift g r = Some (v, r') -> fst r = fst r'.
@@ -470,6 +501,7 @@ Proof.
   - discriminate H.
   - injection H. intros _ H' _. apply H'.
 Qed.
+*)
 
 Lemma shift_sup : forall {vt nt}
     (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
@@ -757,7 +789,7 @@ Proof.
     rewrite (plus_assoc_reverse (w1 + costs g (inf' g l))).
     apply (combine_leb _ (w1 + costs g (inf' g l))).
     + apply IHL.
-    + apply inf_passive in L as L'.
+    + apply shift_inf_passive in L as L'.
       rewrite <- L'. apply IHP.
   - rewrite (in_span_split i j k).
     Focus 2. apply item_i_leb_j in LP. apply LP.
@@ -785,48 +817,11 @@ Proof.
       * rewrite L2' in E. apply E.
 Qed.
 
-(* We know that:
 
-  costs g (in_span i k) <= w1 + w2 + costs g (inf' g l) + costs g (inf' g r)
-
-We thus need to show that:
-
-  costs g (inf' g l) + costs g (inf' g r)
-    <= omega g (fst r) (fst l) + costs g (inf' g l')
-
-* [costs g (inf' g l)] is the minimal cost of what we have matched so far
-  in the active item.
-* [costs g (inf' g r)] is the minimal cost of the entire ET
-  corresponding to [r].
-* [costs g (inf' g l') = costs g (inf' g l)] because we shift over a
-  non-terminal leaf.
-
-Given the third point, it's enough to show that:
-
-  costs g (inf' g r) <= omega g (fst r) (fst l)
-
-given the definition of [omega]:
-
-  Definition omega {vt nt}
-      (g : @Grammar vt nt) (dep gov : vt) : weight :=
-    arc_weight g (anchor g dep) (anchor g gov) +
-    tree_weight g dep.
-
-Now, let's try to solve this in our particular case of singly-lexicalized grammar.
-In this setting, we know that 
-
-  inf' g r = [anchor (fst r)]
-
-Therefore, the LHS is simply the minimal (dep+ET) cost of the anchor
-corresponding to [r].
-
-The RHS, on the other hand, is *the actual* dep+ET cost.  So this should
-hold indeed!
-
-*)
-
+(*
 Theorem monotonic : forall {vt nt} r i j w h t
   (g : @Grammar vt nt) (H: @item vt nt r i j w h t),
     t <= w + h.
 Proof.
 Admitted.
+*)
