@@ -76,6 +76,96 @@ Fixpoint maximum (xs : list nat) : option nat :=
     end
   end.
 
+Lemma le_SS : forall n m,
+  n <= m -> S n <= S m.
+Proof.
+  intros n m H.
+  induction H.
+  - apply le_n.
+  - apply le_S. apply IHle.
+Qed.
+
+Lemma plus_leb : forall (x y z : nat),
+  x <= y -> x + z <= y + z.
+Proof.
+  intros x y z.
+  generalize dependent y.
+  generalize dependent x.
+  induction z as [|z' IH].
+  - intros x y. intros H.
+    rewrite plus_0_r. rewrite plus_0_r. apply H.
+  - intros x y. intros H.
+    rewrite <- plus_Snm_nSm.
+    rewrite <- plus_Snm_nSm.
+    apply IH.
+    apply le_SS. apply H.
+Qed.
+
+Lemma combine_leb : forall x1 y1 x2 y2 : nat,
+  x1 <= y1 ->
+  x2 <= y2 ->
+    x1 + x2 <= y1 + y2.
+Proof.
+  intros x1 y1 x2 y2.
+  intros H1 H2.
+  transitivity (x1 + y2).
+  - rewrite plus_comm. rewrite (plus_comm x1).
+    apply plus_leb. apply H2.
+  - apply plus_leb. apply H1.
+Qed.
+
+Lemma lebP : forall n m, reflect (n <= m) (n <=? m).
+Proof.
+  intros n m. apply iff_reflect. split.
+  - intros H. apply leb_correct. apply H.
+  - intros H. apply leb_complete. apply H.
+Qed.
+
+Lemma O_leb_O : forall i,
+  i <= 0 -> i = 0.
+Proof.
+  intros i.
+  intros H.
+  inversion H.
+  reflexivity.
+Qed.
+
+Lemma leb_trans : forall i j k,
+  i <= j -> j <= k ->
+    i <= k.
+Proof.
+  intros i j k.
+  intros H1 H2.
+  transitivity j.
+  - apply H1.
+  - apply H2.
+Qed.
+
+Lemma app_suf_eq : forall {A : Type} (xs : list A) ys zs,
+  xs = ys -> xs ++ zs = ys ++ zs.
+Proof.
+  intros A xs ys zs.
+Admitted.
+
+Lemma app_pref_eq : forall {A : Type} (l l' pref : list A),
+  pref ++ l = pref ++ l' -> l = l'.
+Proof.
+  intros A l l' pref.
+  induction pref as [|h t].
+  - simpl. intros H. apply H.
+  - intros H. rewrite <- app_comm_cons in H. rewrite <- app_comm_cons in H.
+    injection H as H. apply IHt in H. apply H.
+Qed.
+
+Lemma minus_plus : forall x y z, (x - y) + z = x + (z - y).
+Proof.
+Admitted.
+
+Lemma plus_minus : forall x y z, z + (x - (x + y)) = z - y.
+Proof.
+Admitted.
+
+
 (** Tree Substitution Grammar parser, 1st try.
 *)
 
@@ -175,6 +265,11 @@ Record Grammar {vert non_term : Type} := mkGram
   ; label : vert -> @symbol non_term term
       (* node labeling function *)
 
+  ; root_has_non_term : forall v,
+      root v = true ->
+        exists x, label v = NonTerm x
+      (* label assigned to a root is a non-terminal *)
+
   ; parent : vert -> option vert
       (* parent of the given vertex (root => None) *)
   ; children : vert -> list vert
@@ -198,6 +293,11 @@ Record Grammar {vert non_term : Type} := mkGram
          hence, the set of inferior plus the set of superior
          nodes will always contain this unique anchor. *)
 
+  ; inf_root_anchor : forall v,
+      root v = true ->
+        inf v = [anchor v]
+      (* [inf] of the grammar root contains its single anchor terminal *)
+
   ; inf' : vert * nat -> list term
       (* the list (=>set) of the processed terminals after
          traversing (at most) the give number of children,
@@ -212,9 +312,23 @@ Record Grammar {vert non_term : Type} := mkGram
 
   ; tree_weight : vert -> weight
       (* weight of the ET containing the given node *)
-
   ; arc_weight : term -> term -> weight
       (* weight of the given (dependency, head) arc *)
+
+  ; min_tree_weight : term -> weight
+      (* minimal ET weight for the given terminal *)
+  ; min_arc_weight : term -> weight
+      (* minimal dependency weight for the given dependent *)
+
+  ; min_tree_weight_leb :
+      forall (v : vert) (t : term),
+        anchor v = t ->
+          min_tree_weight t <= tree_weight v
+      (* minimal ET weight smaller than others *)
+  ; min_arc_weight_leb :
+      forall (dep hed : term),
+        min_arc_weight dep <= arc_weight dep hed
+      (* minimal ET weight smaller than others *)
 
   }.
 
@@ -237,11 +351,11 @@ Definition term_max {vt nt} (g : @Grammar vt nt) : term :=
   end.
 *)
 
-
+(*
 (** Weight of the ET with the given rule *)
 Definition rule_weight {vt nt}
     (g : @Grammar vt nt) (r : vt * nat) : weight :=
-  tree_weight g (fst r).
+  tree_weight g (fst r). *)
 
 (** Weight of the given (dependent, head) arc +
     weight of the dependent ET
@@ -251,22 +365,20 @@ Definition omega {vt nt}
   arc_weight g (anchor g dep) (anchor g gov) +
   tree_weight g dep.
 
-(** Minimal arc weight for the given dependent *)
-Definition min_arc_weight {vt nt}
-    (g : @Grammar vt nt) (dep : term) : weight :=
-  match minimum (map (arc_weight g dep) (terminals g)) with
-  | None => 0
-  | Some x => x
-  end.
-
+(*
 (** Weight of the ET with the given rule, provided that it contains
     the given terminal anchor terminal. *)
 Definition rule_with_term_weight {vt nt}
     (g : @Grammar vt nt) (t : term) (r : vt * nat) : option weight :=
   if anchor g (fst r) =? t
   then Some (rule_weight g r)
-  else None.
+  else None. *)
 
+(** The minimal cost of scanning the given terminal *)
+Definition cost {vt nt} (g : @Grammar vt nt) (t : term) : weight :=
+  min_arc_weight g t + min_tree_weight g t.
+
+(*
 (** The minimal cost of scanning the given terminal *)
 Definition cost {vt nt}
     (g : @Grammar vt nt) (t : term) : weight :=
@@ -274,6 +386,7 @@ Definition cost {vt nt}
   | None => 0
   | Some x => x
   end.
+*)
 
 (** The minimal cost of scanning the given list of terminals *)
 Definition costs {vt nt}
@@ -319,20 +432,17 @@ Lemma inf_passive : forall {vt nt} (g : @Grammar vt nt) r,
 Proof.
 Admitted.
 
-(*
-Lemma shift_inf : forall {vt nt} (g : @Grammar vt nt) l l' r,
-  shift g r = None ->
-  shift g l = Some (fst r, l') ->
-    inf' g l' = inf' g l ++ inf' g r.
-Proof.
-Admitted.
-*)
-
 Lemma shift_term_inf : forall {vt nt} (g : @Grammar vt nt) r r' v i,
   shift g r = Some (v, r') ->
   label g v = Terminal i ->
     inf' g r' = inf' g r ++ [i].
 Proof.
+  intros vt nt g r r' v i.
+  intros H1 H2.
+  apply shift_inf in H1 as H3.
+  (* At this point we need to know that [inf leaf]
+     is simply defined in terms of the symbol in the [leaf].
+  *)
 Admitted.
 
 Lemma shift_non_term_leaf_inf : forall {vt nt} (g : @Grammar vt nt) r r' v x,
@@ -343,15 +453,11 @@ Lemma shift_non_term_leaf_inf : forall {vt nt} (g : @Grammar vt nt) r r' v x,
 Proof.
 Admitted.
 
-Lemma app_pref_eq : forall {A : Type} (l l' pref : list A),
-  pref ++ l = pref ++ l' -> l = l'.
+Lemma no_shift_inf : forall {vt nt} (g : @Grammar vt nt) r,
+  shift g r = None ->
+    inf' g r = inf g (fst r).
 Proof.
-  intros A l l' pref.
-  induction pref as [|h t].
-  - simpl. intros H. apply H.
-  - intros H. rewrite <- app_comm_cons in H. rewrite <- app_comm_cons in H.
-    injection H as H. apply IHt in H. apply H.
-Qed.
+Admitted.
 
 Lemma shift_preserves_head : forall {vt nt}
     (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
@@ -433,14 +539,6 @@ Definition amort_weight' {vt nt} (g : @Grammar vt nt) (r : vt*nat) : weight :=
   let n := fst r
   in tree_weight g n + min_arc_weight g (anchor g n) - costs g (sup' g r).
 
-Lemma minus_plus : forall x y z, (x - y) + z = x + (z - y).
-Proof.
-Admitted.
-
-Lemma plus_minus : forall x y z, z + (x - (x + y)) = z - y.
-Proof.
-Admitted.
-
 Lemma shift_amort_weight : forall {vt nt}
     (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
   shift g r' = Some (v, r) ->
@@ -463,7 +561,7 @@ Fixpoint in_span (i j : term) : list term :=
   | 0 => []
   | S j' =>
     if i <=? j'
-    then j' :: in_span i j'
+    then in_span i j' ++ [j']
     else []
   end.
 
@@ -490,7 +588,42 @@ Qed.
 Theorem in_span_Sj : forall i j : term,
   i <= j -> in_span i (S j) = in_span i j ++ [j].
 Proof.
-Admitted.
+  intros i j H.
+  simpl.
+  destruct (lebP i j) as [H'|H'].
+  - reflexivity.
+  - apply H' in H. destruct H.
+Qed.
+
+Lemma in_span_split : forall i j k,
+  i <= j ->
+  j <= k ->
+    in_span i k = in_span i j ++ in_span j k.
+Proof.
+  intros i j k H1 H2.
+  generalize dependent j.
+  generalize dependent i.
+  induction k as [|k'].
+  - intros i j.
+    simpl.
+    intros H1 H2.
+    assert (H3: j = 0). { apply O_leb_O in H2. apply H2. }
+    assert (H4: i = 0). { rewrite H3 in H1. apply O_leb_O in H1. apply H1. }
+    rewrite H3. rewrite H4. rewrite in_span_ii_empty. simpl. reflexivity.
+  - intros i j. intros H1 H2.
+    inversion H2 as [H3|m H3 H4].
+    + rewrite in_span_ii_empty. rewrite app_nil_r. reflexivity.
+    + apply (leb_trans i j m) in H1 as H5.
+      Focus 2. rewrite H4. apply H3.
+      apply (in_span_Sj i m) in H5. rewrite H4 in H5.
+      apply (in_span_Sj j k') in H3 as H6.
+      rewrite H5. rewrite H6.
+      rewrite app_assoc.
+      apply app_suf_eq.
+      apply IHk'.
+      * apply H1.
+      * apply H3.
+Qed.
 
 (** The list (=>set) of terminals outside of the given span *)
 (** TODO: rename as [out] at some point *)
@@ -540,7 +673,7 @@ Inductive item {vt nt}
       (E: label g v = label g (fst r)) :
         item g l' i k (w1 + w2 + omega g (fst r) (fst l)) (heuristic g l' i k) 0.
 
-Theorem i_leb_j : forall {vt nt} r i j w h t
+Theorem item_i_leb_j : forall {vt nt} r i j w h t
   (g : @Grammar vt nt) (H: @item vt nt g r i j w h t),
     i <= j.
 Proof.
@@ -549,32 +682,30 @@ Proof.
   induction eta
     as [ g r' i' I L
        | g r1 r2 i' j' v w' h' _t' P IHP L E1 E2
-       | | ].
+       | g l r' l' i' j' k w1 w2 h1 h2 _t1 _t2 LP IHL RP IHP L E
+       | g l r l' i j k v w1 w2 h1 h2 _t1 _t2 LP IHL RP IHP L1 L2 L3 L4 E
+       ].
   - reflexivity.
-  - 
-Admitted.
-
-Lemma plus_leq : forall (x y z : nat),
-  x <= y -> x + z <= y + z.
-Proof. Admitted.
-
-Lemma combine_leq : forall x1 y1 x2 y2 : nat,
-  x1 <= y1 ->
-  x2 <= y2 ->
-    x1 + x2 <= y1 + y2.
-Proof.
-Admitted.
-
-Lemma in_span_split : forall i j k,
-  in_span i k = in_span i j ++ in_span j k.
-Proof.
-Admitted.
+  - apply le_S. apply IHP.
+  - transitivity j'. { apply IHL. } { apply IHP. }
+  - transitivity j. { apply IHL. } { apply IHP. }
+Qed.
 
 Lemma inf_cost_vs_omega : forall {vt nt} (g : @Grammar vt nt) (v w : vt),
   root g v = true ->
     costs g (inf g v) <= omega g v w.
 Proof.
-Admitted.
+  intros vt nt g v w.
+  intros RH.
+  unfold omega.
+  apply inf_root_anchor in RH as H.
+  rewrite H.
+  unfold costs. simpl.
+  unfold cost.
+  apply (combine_leb).
+  - apply min_arc_weight_leb.
+  - apply min_tree_weight_leb. reflexivity.
+Qed.
 
 Lemma inf_cost_vs_omega' :
   forall {vt nt} (g : @Grammar vt nt) (r : vt*nat) (w : vt),
@@ -582,13 +713,13 @@ Lemma inf_cost_vs_omega' :
     root g (fst r) = true ->
       costs g (inf' g r) <= omega g (fst r) w.
 Proof.
-Admitted.
-
-Lemma root_has_non_term : forall {vt nt} (g : @Grammar vt nt) v,
-  root g v = true ->
-    exists x, label g v = NonTerm x.
-Proof.
-Admitted.
+  intros vt nt g r w H.
+  apply no_shift_inf in H as H'.
+  rewrite H'.
+  intros R.
+  apply inf_cost_vs_omega.
+  apply R.
+Qed.
 
 Theorem in_vs_inside : forall {vt nt} r i j w h t
   (g : @Grammar vt nt) (H: @item vt nt g r i j w h t),
@@ -605,15 +736,17 @@ Proof.
   - simpl. rewrite in_span_ii_empty.
     unfold costs. simpl. apply le_0_n.
   - rewrite in_span_Sj.
-    Focus 2. apply (i_leb_j r1 i' j' w' h' _t' g). apply P.
+    Focus 2. apply (item_i_leb_j r1 i' j' w' h' _t' g). apply P.
     rewrite (shift_term_inf g r1 r2 v j').
     + rewrite costs_app. rewrite costs_app.
       rewrite plus_assoc.
-      apply (plus_leq _ _ (costs g [j'])).
+      apply (plus_leb _ _ (costs g [j'])).
       apply IHP.
     + apply E1.
     + apply E2.
   - rewrite (in_span_split i' j' k).
+    Focus 2. apply item_i_leb_j in LP. apply LP.
+    Focus 2. apply item_i_leb_j in RP. apply RP.
     rewrite costs_app.
     apply shift_inf in E as E'.
     rewrite <- E'. rewrite costs_app.
@@ -622,11 +755,13 @@ Proof.
     rewrite (plus_comm w2).
     rewrite (plus_assoc).
     rewrite (plus_assoc_reverse (w1 + costs g (inf' g l))).
-    apply (combine_leq _ (w1 + costs g (inf' g l))).
+    apply (combine_leb _ (w1 + costs g (inf' g l))).
     + apply IHL.
     + apply inf_passive in L as L'.
       rewrite <- L'. apply IHP.
   - rewrite (in_span_split i j k).
+    Focus 2. apply item_i_leb_j in LP. apply LP.
+    Focus 2. apply item_i_leb_j in RP. apply RP.
     rewrite costs_app.
     rewrite plus_comm.
     rewrite (plus_comm w1).
@@ -634,11 +769,11 @@ Proof.
     rewrite (plus_comm w1).
     rewrite (plus_assoc).
     rewrite (plus_assoc_reverse (w2 + omega g (fst r) (fst l))).
-    apply (combine_leq _ (w2 + omega g (fst r) (fst l))).
+    apply (combine_leb _ (w2 + omega g (fst r) (fst l))).
     + transitivity (w2 + costs g (inf' g r)).
       * apply IHP.
       * rewrite (plus_comm w2). rewrite (plus_comm w2).
-        apply plus_leq.
+        apply plus_leb.
         apply (inf_cost_vs_omega' g r (fst l)).
         { apply L1. } { apply L2. }
     + apply root_has_non_term in L2 as L2'.
@@ -649,14 +784,6 @@ Proof.
       * apply L4.
       * rewrite L2' in E. apply E.
 Qed.
-
-(*
-Lemma shift_non_term_leaf_inf : forall {vt nt} (g : @Grammar vt nt) r r' v x,
-  shift g r = Some (v, r') ->
-  leaf g v = true ->
-  label g v = NonTerm x ->
-    inf' g r' = inf' g r.
-*)
 
 (* We know that:
 
