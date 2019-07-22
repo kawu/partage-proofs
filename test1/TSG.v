@@ -145,7 +145,10 @@ Lemma app_suf_eq : forall {A : Type} (xs : list A) ys zs,
   xs = ys -> xs ++ zs = ys ++ zs.
 Proof.
   intros A xs ys zs.
-Admitted.
+  intros H.
+  rewrite H.
+  reflexivity.
+Qed.
 
 Lemma app_pref_eq : forall {A : Type} (l l' pref : list A),
   pref ++ l = pref ++ l' -> l = l'.
@@ -157,14 +160,40 @@ Proof.
     injection H as H. apply IHt in H. apply H.
 Qed.
 
-Lemma minus_plus : forall x y z, (x - y) + z = x + (z - y).
+Lemma app_pref_eq' : forall {A : Type} (l l' pref : list A),
+  l = l' -> pref ++ l = pref ++ l'.
 Proof.
-Admitted.
+  intros A l l' pref.
+  intros H.
+  rewrite H.
+  reflexivity.
+Qed.
 
-Lemma plus_minus : forall x y z, z + (x - (x + y)) = z - y.
+Lemma minus_plus : forall x y z,
+  y <= x ->
+    (x - y) + z = (x + z) - y.
 Proof.
-Admitted.
+  intros x y z. intros H.
+  induction z as [|z' IH].
+  - rewrite plus_0_r. rewrite plus_0_r. reflexivity.
+  - rewrite Nat.add_succ_r.
+    rewrite Nat.add_succ_r.
+    rewrite IH.
+    rewrite minus_Sn_m.
+    + reflexivity.
+    + transitivity x.
+      * apply H.
+      * apply le_plus_l.
+Qed.
 
+Lemma plus_minus : forall x y z,
+  (x + y) - (y + z) = x - z.
+Proof.
+  intros x y z.
+  induction y as [|y' IH].
+  - simpl. rewrite plus_0_r. reflexivity.
+  - simpl. rewrite <- plus_Snm_nSm. simpl. apply IH.
+Qed.
 
 (** Tree Substitution Grammar parser, 1st try.
 *)
@@ -571,6 +600,42 @@ Definition amort_weight' {vt nt} (g : @Grammar vt nt) (r : vt*nat) : weight :=
   let n := fst r
   in tree_weight g n + min_arc_weight g (anchor g n) - costs g (sup' g r).
 
+Search (0 <= _).
+
+Lemma sup'_destr : forall {vt nt}
+  (g : @Grammar vt nt) (r : vt*nat) (x : nat) (l : list nat),
+    sup' g r = x :: l ->
+      x = anchor g (fst r) /\ l = [].
+Proof.
+  intros vt nt g r x l.
+  intros H.
+  (* assert (H': inf' g r = []). *)
+  apply (app_pref_eq' _ _ (inf' g r)) in H as H'.
+  rewrite inf_plus_sup' in H'.
+  destruct (inf' g r) eqn:E.
+  - simpl in H'.
+    inversion H'.
+    split.
+    + reflexivity.
+    + reflexivity.
+  - inversion H'.
+    destruct l0 eqn:E'.
+    + simpl in H2. discriminate H2.
+    + simpl in H2. discriminate H2.
+Qed.
+
+(*
+Lemma app_suf_eq : forall {A : Type} (xs : list A) ys zs,
+  xs = ys -> xs ++ zs = ys ++ zs.
+
+Lemma app_pref_eq : forall {A : Type} (l l' pref : list A),
+  pref ++ l = pref ++ l' -> l = l'.
+
+  ; inf_plus_sup' :
+      forall (r : vert * nat),
+        inf' r ++ sup' r = [anchor (fst r)]
+*)
+
 Lemma shift_amort_weight : forall {vt nt}
     (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
   shift g r' = Some (v, r) ->
@@ -580,11 +645,20 @@ Proof.
   unfold amort_weight'.
   apply shift_preserves_head in H as H'.
   rewrite H'.
-  (* Unset Printing Notations. *)
-  rewrite minus_plus.
-  rewrite (shift_cost_sup g r r') with (v := v).
-  - rewrite plus_minus. reflexivity.
-  - apply H.
+  apply shift_cost_sup in H as H''.
+  rewrite (minus_plus
+          (tree_weight g (fst r) + min_arc_weight g (anchor g (fst r)))
+          (costs g (sup' g r'))).
+  - rewrite H''. rewrite plus_minus. reflexivity.
+  - destruct (sup' g r') eqn:E.
+    + unfold costs. simpl. apply Peano.le_0_n.
+    + apply sup'_destr in E as [E1 E2].
+      rewrite E2. unfold costs.
+      simpl. unfold cost. rewrite plus_comm.
+      apply (combine_leb).
+        * apply min_tree_weight_leb.
+          rewrite E1. rewrite H'. reflexivity.
+        * rewrite E1. rewrite H'. reflexivity.
 Qed.
 
 (** The list (=>set) of terminals inside the given span *)
