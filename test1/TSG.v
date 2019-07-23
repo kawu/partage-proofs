@@ -975,12 +975,12 @@ Proof.
   simpl. reflexivity.
 Qed.
 
+(* TODO: prove based on cost_rest_plus_in_r *)
 Lemma cost_rest_Sj : forall {vt nt} (g : @Grammar vt nt) (i j : term),
-  i <= j ->
   j <= term_max g ->
     costs g (rest g i j) = costs g (rest g i (S j)) + cost g j.
 Proof.
-  intros vt nt g i j H1 H2.
+  intros vt nt g i j H2.
   unfold rest.
   rewrite costs_app.
   rewrite costs_app.
@@ -996,30 +996,41 @@ Proof.
     apply le_n_S. apply H2.
 Qed.
 
-(*
-Theorem in_span_Si : forall i j : term,
-  i <= j -> [i] ++ in_span (S i) j = in_span i j.
-*)
-
-Lemma cost_rest_min_in : forall {vt nt}
+Lemma cost_rest_plus_in_r : forall {vt nt}
   (g : @Grammar vt nt) (i j k : term),
-    costs g (rest g i k) = costs g (rest g i j) - costs g (in_span j k).
+    j <= k ->
+    k <= term_max g + 1 ->
+      costs g (rest g i j) = costs g (rest g i k) + costs g (in_span j k).
 Proof.
-Admitted.
+  intros vt nt g i j k H1 H2.
+  unfold rest.
+  rewrite costs_app. rewrite costs_app.
+  rewrite <- plus_assoc.
+  apply f_equal2_plus. { reflexivity. }
+  rewrite (in_span_split j k).
+  - rewrite costs_app. rewrite plus_comm. reflexivity.
+  - apply H1.
+  - apply H2.
+Qed.
 
 Lemma cost_rest_plus_in_l : forall {vt nt}
   (g : @Grammar vt nt) (i j k : term),
-    costs g (rest g j k) = costs g (in_span i j) + costs g (rest g i k).
+    i <= j ->
+      costs g (rest g j k) = costs g (in_span i j) + costs g (rest g i k).
 Proof.
-Admitted.
-
-Lemma cost_rest_plus_in_r : forall {vt nt}
-  (g : @Grammar vt nt) (i j k : term),
-    costs g (rest g i j) = costs g (rest g i k) + costs g (in_span j k).
-Proof.
-Admitted.
-
-
+  intros vt nt g i j k H1.
+  unfold rest.
+  rewrite costs_app.
+  rewrite costs_app.
+  rewrite plus_assoc.
+  apply (f_equal2_plus).
+  Focus 2. reflexivity.
+  rewrite plus_comm.
+  rewrite (in_span_split 0 i j).
+  - rewrite costs_app. reflexivity.
+  - apply le_0_n.
+  - apply H1.
+Qed.
 
 Definition heuristic {vt nt}
   (g : @Grammar vt nt) (r : vt*nat) (i j : term) : weight :=
@@ -1087,6 +1098,12 @@ Proof.
   - transitivity j'. { apply IHL. } { apply IHP. }
   - transitivity j. { apply IHL. } { apply IHP. }
 Qed.
+
+Theorem item_j_leb_term_max : forall {vt nt} r i j w t (g : @Grammar vt nt)
+  (H: @item vt nt g r i j w t),
+    j <= term_max g + 1.
+Proof.
+Admitted.
 
 Lemma inf_cost_vs_omega : forall {vt nt} (g : @Grammar vt nt) (v w : vt),
   root g v = true ->
@@ -1219,9 +1236,11 @@ Proof.
        | g l r l' i j k v w1 w2 _t1 _t2 LP IHL RP IHP L1 L2 L3 L4 E
        ].
 
-  - simpl. apply Peano.le_0_n.
+  - (* AX *)
+    simpl. apply Peano.le_0_n.
 
-  - unfold total.
+  - (* SC *)
+    unfold total.
     rewrite (plus_comm w'). rewrite (plus_comm w').
     apply plus_leb_r.
     unfold heuristic.
@@ -1230,16 +1249,17 @@ Proof.
     rewrite <- plus_assoc.
     apply combine_leb. reflexivity.
     apply (item_i_leb_j r1 i' j' w') in P as P'.
-    apply (cost_rest_Sj g) in P'.
-    rewrite P'.
+    apply (cost_rest_Sj g i') in L.
+    rewrite L.
     apply term_inf in E2. rewrite E2.
     rewrite plus_comm.
     apply combine_leb.
     reflexivity.
     reflexivity.
-    apply L.
 
-  - apply Nat.max_lub_iff. split.
+  - (* PS *)
+    apply Nat.max_lub_iff. split.
+
     + unfold total.
       rewrite <- plus_assoc.
       apply combine_leb. { reflexivity. }
@@ -1250,20 +1270,24 @@ Proof.
       rewrite <- plus_assoc.
       apply combine_leb. { reflexivity. }
       rewrite (cost_rest_plus_in_r g i' j' k).
-      rewrite (plus_comm _ (costs g (rest g i' k))).
-      rewrite <- plus_assoc.
-      apply combine_leb. { reflexivity. }
-      rewrite <- shift_inf_passive.
-      Focus 2. apply L.
-      rewrite plus_comm.
-      apply (in_vs_inside r' j' k w2 _t2).
-      apply RP.
+      * rewrite (plus_comm _ (costs g (rest g i' k))).
+        rewrite <- plus_assoc.
+        apply combine_leb. { reflexivity. }
+        rewrite <- shift_inf_passive.
+        Focus 2. apply L.
+        rewrite plus_comm.
+        apply (in_vs_inside r' j' k w2 _t2).
+        apply RP.
+      * apply item_i_leb_j in RP. apply RP.
+      * apply item_j_leb_term_max in RP. apply RP.
+
     + unfold total.
       rewrite (plus_comm w1).
       rewrite <- plus_assoc.
       apply combine_leb. { reflexivity. }
       unfold heuristic.
       rewrite (cost_rest_plus_in_l g i' j' k).
+        Focus 2. apply item_i_leb_j in LP. apply LP.
       rewrite plus_assoc. rewrite plus_assoc.
       apply combine_leb. Focus 2. reflexivity.
       rewrite (plus_comm w1).
