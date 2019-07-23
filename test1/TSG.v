@@ -359,21 +359,19 @@ Record Grammar {vert non_term : Type} := mkGram
   ; shift_preserves_head : forall r r' v,
       shift r = Some (v, r') ->
         fst r = fst r'
-
   ; shift_inf : forall r r' v,
       shift r = Some (v, r') ->
         inf' r ++ inf v = inf' r'
-
-(*
-  ; shift_inf' : forall r r' v,
-      shift r = Some (v, r') ->
-        inf v ++ inf' r = inf' r'
-      (* this one is somewhat dangerous! *)
-*)
-
   ; shift_inf_passive : forall r,
       shift r = None ->
         inf' r = inf (fst r)
+
+(*
+  ; shift_sup_passive : forall r,
+      shift r = None ->
+        sup' r = sup (fst r)
+*)
+
   ; shift_term_inf : forall r r' v i,
       shift r = Some (v, r') ->
       label v = Terminal i ->
@@ -479,6 +477,25 @@ Proof.
       + rewrite H1 in E2. discriminate E2.
       + rewrite H2 in E1. discriminate E1.
 
+Qed.
+
+Lemma shift_sup_passive :  forall {vt nt}
+  (g : @Grammar vt nt) (r : vt * nat),
+    shift g r = None ->
+      sup' g r = sup g (fst r).
+Proof.
+  (* NOTE: maybe a simpler proof could be devised? *)
+  intros vt nt g r. intros H1.
+  apply shift_inf_passive in H1 as H2.
+  apply (app_pref_eq_r' _ _ (sup' g r)) in H2 as H3.
+  apply (app_pref_eq_r' _ _ (sup g (fst r))) in H2.
+  rewrite inf_plus_sup in H2.
+  rewrite inf_plus_sup' in H3.
+  rewrite H3 in H2.
+  apply shift_inf_passive in H1 as H4.
+  rewrite H4 in H2.
+  apply (app_pref_eq) in H2.
+  rewrite H2. reflexivity.
 Qed.
 
 (** The list (=>set) of production rules in the grammar *)
@@ -860,6 +877,12 @@ Fixpoint in_span (i j : term) : list term :=
     else []
   end.
 
+Example in_span_ex1 : in_span 1 3 = [1; 2].
+Proof. reflexivity. Qed.
+
+Example in_span_ex2 : in_span 1 1 = [].
+Proof. reflexivity. Qed.
+
 Lemma not_S_i_leb_i : forall (i : term), (S i <=? i = false).
 Proof.
   intros i.
@@ -889,6 +912,12 @@ Proof.
   - reflexivity.
   - apply H' in H. destruct H.
 Qed.
+
+Theorem in_span_Si : forall i j : term,
+  S i <= j -> [i] ++ in_span (S i) j = in_span i j.
+Proof.
+  intros i j H.
+Admitted.
 
 Lemma in_span_split : forall i j k,
   i <= j ->
@@ -922,8 +951,75 @@ Qed.
 
 (** The list (=>set) of terminals outside of the given span *)
 (** TODO: rename as [out] at some point *)
+(** TODO: [term_max g] or [term_max g + 1]? *)
 Definition rest {vt nt} (g : @Grammar vt nt) (i j : term) : list term :=
-  in_span 0 (i - 1) ++ in_span (j + 1) (term_max g).
+  in_span 0 i ++ in_span j (term_max g + 1).
+
+(*
+Lemma rest_Sj : forall {vt nt} (g : @Grammar vt nt) (i j : term),
+  i <= j -> rest g i j = rest g i (S j) ++ [j].
+Proof.
+  intros vt nt g i j H.
+  unfold rest.
+  rewrite <- app_assoc.
+  apply app_pref_eq'.
+  simpl.
+Admitted.
+*)
+
+Lemma cost_one : forall {vt nt} (g : @Grammar vt nt) (i : term),
+  cost g i = costs g [i].
+Proof.
+  intros vt nt g i.
+  unfold costs.
+  simpl. reflexivity.
+Qed.
+
+Lemma cost_rest_Sj : forall {vt nt} (g : @Grammar vt nt) (i j : term),
+  i <= j ->
+  j <= term_max g ->
+    costs g (rest g i j) = costs g (rest g i (S j)) + cost g j.
+Proof.
+  intros vt nt g i j H1 H2.
+  unfold rest.
+  rewrite costs_app.
+  rewrite costs_app.
+  rewrite <- plus_assoc.
+  apply (f_equal2_plus). { reflexivity. }
+  simpl.
+  rewrite <- in_span_Si.
+  - simpl. rewrite cost_one.
+    rewrite (plus_comm _ (costs g [j])).
+    rewrite <- costs_app.
+    simpl. reflexivity.
+  - rewrite plus_comm. simpl.
+    apply le_n_S. apply H2.
+Qed.
+
+(*
+Theorem in_span_Si : forall i j : term,
+  i <= j -> [i] ++ in_span (S i) j = in_span i j.
+*)
+
+Lemma cost_rest_min_in : forall {vt nt}
+  (g : @Grammar vt nt) (i j k : term),
+    costs g (rest g i k) = costs g (rest g i j) - costs g (in_span j k).
+Proof.
+Admitted.
+
+Lemma cost_rest_plus_in_l : forall {vt nt}
+  (g : @Grammar vt nt) (i j k : term),
+    costs g (rest g j k) = costs g (in_span i j) + costs g (rest g i k).
+Proof.
+Admitted.
+
+Lemma cost_rest_plus_in_r : forall {vt nt}
+  (g : @Grammar vt nt) (i j k : term),
+    costs g (rest g i j) = costs g (rest g i k) + costs g (in_span j k).
+Proof.
+Admitted.
+
+
 
 Definition heuristic {vt nt}
   (g : @Grammar vt nt) (r : vt*nat) (i j : term) : weight :=
@@ -1096,41 +1192,18 @@ Proof.
 Admitted.
 *)
 
-Lemma rest_Sj : forall {vt nt} (g : @Grammar vt nt) (i j : term),
-  i <= j -> rest g i j = rest g i (S j) ++ [j].
-Proof. Admitted.
-(*
-  intros i j H.
-  simpl.
-  destruct (lebP i j) as [H'|H'].
-  - reflexivity.
-  - apply H' in H. destruct H.
-Qed. *)
-
-Lemma cost_rest_min_in : forall {vt nt}
-  (g : @Grammar vt nt) (i j k : term),
-    costs g (rest g i k) = costs g (rest g i j) - costs g (in_span j k).
-Proof.
-Admitted.
-
-Lemma cost_rest_plus_in_l : forall {vt nt}
-  (g : @Grammar vt nt) (i j k : term),
-    costs g (rest g j k) = costs g (in_span i j) + costs g (rest g i k).
-Proof.
-Admitted.
-
-Lemma cost_rest_plus_in_r : forall {vt nt}
-  (g : @Grammar vt nt) (i j k : term),
-    costs g (rest g i j) = costs g (rest g i k) + costs g (in_span j k).
-Proof.
-Admitted.
-
 Lemma amort_weight_complete : forall {vt nt}
   (g : @Grammar vt nt) (r : vt*nat),
     shift g r = None ->
       amort_weight g (fst r) = amort_weight' g r.
 Proof.
-Admitted.
+  intros vt nt g r.
+  intros H.
+  unfold amort_weight.
+  unfold amort_weight'.
+  apply shift_sup_passive in H.
+  rewrite H. reflexivity.
+Qed.
 
 Theorem monotonic : forall {vt nt} r i j w t
   (g : @Grammar vt nt) (H: @item vt nt g r i j w t),
@@ -1145,7 +1218,9 @@ Proof.
        | g l r' l' i' j' k w1 w2 _t1 _t2 LP IHL RP IHP L E
        | g l r l' i j k v w1 w2 _t1 _t2 LP IHL RP IHP L1 L2 L3 L4 E
        ].
+
   - simpl. apply Peano.le_0_n.
+
   - unfold total.
     rewrite (plus_comm w'). rewrite (plus_comm w').
     apply plus_leb_r.
@@ -1155,14 +1230,15 @@ Proof.
     rewrite <- plus_assoc.
     apply combine_leb. reflexivity.
     apply (item_i_leb_j r1 i' j' w') in P as P'.
-    apply (rest_Sj g) in P'.
+    apply (cost_rest_Sj g) in P'.
     rewrite P'.
-    rewrite costs_app.
     apply term_inf in E2. rewrite E2.
     rewrite plus_comm.
     apply combine_leb.
     reflexivity.
     reflexivity.
+    apply L.
+
   - apply Nat.max_lub_iff. split.
     + unfold total.
       rewrite <- plus_assoc.
