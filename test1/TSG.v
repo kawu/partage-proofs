@@ -366,12 +366,6 @@ Record Grammar {vert non_term : Type} := mkGram
       shift r = None ->
         inf' r = inf (fst r)
 
-(*
-  ; shift_sup_passive : forall r,
-      shift r = None ->
-        sup' r = sup (fst r)
-*)
-
   ; shift_term_inf : forall r r' v i,
       shift r = Some (v, r') ->
       label v = Terminal i ->
@@ -917,7 +911,21 @@ Theorem in_span_Si : forall i j : term,
   S i <= j -> [i] ++ in_span (S i) j = in_span i j.
 Proof.
   intros i j H.
-Admitted.
+  induction H.
+  - simpl. destruct i as [|i'] eqn:E.
+    + simpl. reflexivity.
+    + rewrite not_S_i_leb_i.
+      rewrite Nat.leb_refl.
+      rewrite in_span_ii_empty.
+      simpl. reflexivity.
+  - rewrite in_span_Sj.
+    Focus 2. apply H.
+    rewrite in_span_Sj.
+    + rewrite <- IHle. rewrite app_assoc. reflexivity.
+    + transitivity (S i).
+      * apply le_S. reflexivity.
+      * apply H.
+Qed.
 
 Lemma in_span_split : forall i j k,
   i <= j ->
@@ -1103,7 +1111,19 @@ Theorem item_j_leb_term_max : forall {vt nt} r i j w t (g : @Grammar vt nt)
   (H: @item vt nt g r i j w t),
     j <= term_max g + 1.
 Proof.
-Admitted.
+  intros vt nt r i j w t g.
+  intros eta.
+  induction eta
+    as [ g r' i' I L
+       | g r1 r2 i' j' v w' _t' P IHP L E1 E2
+       | g l r' l' i' j' k w1 w2 _t1 _t2 LP IHL RP IHP L E
+       | g l r l' i j k v w1 w2 _t1 _t2 LP IHL RP IHP L1 L2 L3 L4 E
+       ].
+  - rewrite Nat.add_1_r. apply le_S. apply L.
+  - rewrite Nat.add_1_r. apply le_n_S. apply L.
+  - apply IHP.
+  - apply IHP.
+Qed.
 
 Lemma inf_cost_vs_omega : forall {vt nt} (g : @Grammar vt nt) (v w : vt),
   root g v = true ->
