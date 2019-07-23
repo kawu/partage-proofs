@@ -237,44 +237,6 @@ Inductive symbol {nt t} : Type :=
   | NonTerm (x : nt)
   | Terminal (x : t).
 
-(*
-Inductive rule {v : Type} :=
-  | Rule (head : v) (body : list v).
-
-Definition head {v : Type} (r : @rule v) : v :=
-  match r with
-  | Rule x y => x
-  end.
-
-Definition body {v : Type} (r : @rule v) : list v :=
-  match r with
-  | Rule x y => y
-  end.
-
-(* Leading symbol in the body of the rule *)
-Definition lead (r : rule) : option node :=
-  match r with
-  | Rule _ (h :: t) => Some h
-  | _ => None
-  end.
-
-(* Shift the dot in the rule (if possible) *)
-Definition shift (r : rule) : rule :=
-  match r with
-  | Rule x (h :: t) => Rule x t
-  | _ => r
-  end.
-*)
-
-(*
-(* Shift the dot in the rule (if possible) *)
-Definition shift {v : Type} (r : @rule v) : option (v * @rule v) :=
-  match r with
-  | Rule x (h :: t) => Some (h, Rule x t)
-  | _ => None
-  end.
-*)
-
 (* Weight; eventually should be represented by a real number? *)
 Definition weight := nat.
 
@@ -402,10 +364,12 @@ Record Grammar {vert non_term : Type} := mkGram
       shift r = Some (v, r') ->
         inf' r ++ inf v = inf' r'
 
+(*
   ; shift_inf' : forall r r' v,
       shift r = Some (v, r') ->
         inf v ++ inf' r = inf' r'
       (* this one is somewhat dangerous! *)
+*)
 
   ; shift_inf_passive : forall r,
       shift r = None ->
@@ -434,7 +398,7 @@ Record Grammar {vert non_term : Type} := mkGram
         anchor v = anchor (fst l')
   }.
 
-Lemma inf_tail_empty : forall {vt nt}
+Lemma inf'_tail_empty : forall {vt nt}
   (g : @Grammar vt nt) (r : vt * nat) x l,
     inf' g r = x :: l ->
       l = [].
@@ -451,6 +415,70 @@ Proof.
     destruct l as [|h t] eqn:E'.
     + reflexivity.
     + simpl in H. discriminate H.
+Qed.
+
+(*
+Lemma inf_tail_empty : forall {vt nt}
+  (g : @Grammar vt nt) v x l,
+    inf g v = x :: l ->
+      l = [].
+Proof.
+Admitted. *)
+
+Lemma shift_one_empty :  forall {vt nt}
+  (g : @Grammar vt nt) (r r' : vt * nat) v,
+      shift g r = Some (v, r') ->
+        inf g v = [] \/ inf' g r = [].
+Proof.
+
+  intros vt nt g r r' v.
+  intros H1.
+  apply shift_inf in H1 as H2.
+  destruct (inf' g r') as [|h t] eqn:E1.
+
+  - destruct (inf' g r) as [|h' t'] eqn:E2.
+    + right. reflexivity.
+    + simpl in H2. discriminate H2.
+
+  - apply inf'_tail_empty in E1 as E2.
+    rewrite E2 in E1. rewrite E2 in H2.
+
+    destruct (inf' g r) as [|h' t'] eqn:E3.
+      + right. reflexivity.
+      + simpl in H2.
+        injection H2 as H3 H4.
+
+        destruct t'.
+        * simpl in H4. left. apply H4.
+        * simpl in H4.  discriminate H4.
+Qed.
+
+Lemma shift_inf' :  forall {vt nt}
+  (g : @Grammar vt nt) (r r' : vt * nat) v,
+      shift g r = Some (v, r') ->
+        inf g v ++ inf' g r = inf' g r'.
+Proof.
+  intros vt nt g r r' v H.
+
+  destruct (inf' g r) as [|h t] eqn:E1.
+
+  * rewrite <- E1.
+    rewrite <- (shift_inf g r r' v).
+    Focus 2. apply H.
+    destruct (inf' g r) as [|h t] eqn:E2.
+    - simpl. rewrite app_nil_r. reflexivity.
+    - discriminate E1.
+
+  * rewrite <- (shift_inf g r r' v).
+    Focus 2. apply H.
+    rewrite E1.
+
+    destruct (inf g v) as [|h' t'] eqn:E2.
+    - simpl. rewrite app_nil_r. reflexivity.
+    - apply shift_one_empty in H as [H1 | H2].
+      + rewrite H1 in E2. discriminate E2.
+      + rewrite H2 in E1. discriminate E1.
+
 Qed.
 
 (** The list (=>set) of production rules in the grammar *)
