@@ -104,7 +104,24 @@ Qed.
 Lemma plus_leb_l : forall (x y z : nat),
   x + z <= y + z -> x <= y.
 Proof.
-Admitted.
+  intros x y z.
+  generalize dependent y.
+  generalize dependent x.
+  induction z as [|z' IH].
+  - intros x y. intros H.
+    rewrite plus_0_r in H.
+    rewrite plus_0_r in H.
+    apply H.
+  - intros x y. intros H.
+    rewrite <- plus_Snm_nSm in H.
+    rewrite <- plus_Snm_nSm in H.
+    apply IH in H.
+    inversion H.
+    + reflexivity.
+    + transitivity (S x).
+      * apply le_S. reflexivity.
+      * apply H1.
+Qed.
 
 Lemma combine_leb : forall x1 y1 x2 y2 : nat,
   x1 <= y1 ->
@@ -174,6 +191,15 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma app_pref_eq_r' : forall {A : Type} (l l' pref : list A),
+  l = l' -> l ++ pref = l' ++ pref.
+Proof.
+  intros A l l' pref.
+  intros H.
+  rewrite H.
+  reflexivity.
+Qed.
+
 Lemma minus_plus : forall x y z,
   y <= x ->
     (x - y) + z = (x + z) - y.
@@ -199,11 +225,6 @@ Proof.
   - simpl. rewrite plus_0_r. reflexivity.
   - simpl. rewrite <- plus_Snm_nSm. simpl. apply IH.
 Qed.
-
-Theorem max_leb_split : forall x y z,
-  max x y <= z <-> x <= z /\ y <= z.
-Proof.
-Admitted.
 
 (** Tree Substitution Grammar parser, 1st try.
 *)
@@ -376,9 +397,16 @@ Record Grammar {vert non_term : Type} := mkGram
   ; shift_preserves_head : forall r r' v,
       shift r = Some (v, r') ->
         fst r = fst r'
+
   ; shift_inf : forall r r' v,
       shift r = Some (v, r') ->
         inf' r ++ inf v = inf' r'
+
+  ; shift_inf' : forall r r' v,
+      shift r = Some (v, r') ->
+        inf v ++ inf' r = inf' r'
+      (* this one is somewhat dangerous! *)
+
   ; shift_inf_passive : forall r,
       shift r = None ->
         inf' r = inf (fst r)
@@ -405,6 +433,25 @@ Record Grammar {vert non_term : Type} := mkGram
       shift l = Some (v, l') ->
         anchor v = anchor (fst l')
   }.
+
+Lemma inf_tail_empty : forall {vt nt}
+  (g : @Grammar vt nt) (r : vt * nat) x l,
+    inf' g r = x :: l ->
+      l = [].
+Proof.
+  intros vt nt g r x l.
+  intros H.
+  destruct (inf' g r) as [|x' l'] eqn:E.
+  - discriminate H.
+  - injection H as H1 H2.
+    apply (app_pref_eq_r' _ _ (sup' g r)) in E.
+    rewrite inf_plus_sup' in E.
+    simpl in E. injection E as E.
+    rewrite H2 in H.
+    destruct l as [|h t] eqn:E'.
+    + reflexivity.
+    + simpl in H. discriminate H.
+Qed.
 
 (** The list (=>set) of production rules in the grammar *)
 Definition rules {vt nt} (g : @Grammar vt nt) : list (vt*nat) :=
@@ -569,6 +616,24 @@ Proof.
   - discriminate H.
 Qed.
 
+Lemma shift_sup' : forall {vt nt}
+    (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
+  shift g r' = Some (v, r) ->
+    sup g v = inf' g r' ++ sup' g r.
+Proof.
+  intros vt nt g r r' v H.
+  destruct (shift g r') as [r''|] eqn:E.
+  - apply app_pref_eq with (pref := inf g v).
+    rewrite app_assoc. rewrite H in E.
+    apply shift_inf' in E as E1.
+    rewrite E1.
+    rewrite inf_plus_sup.
+    rewrite inf_plus_sup'.
+    apply shift_preserves_anchor in E as E2.
+    rewrite E2. reflexivity.
+  - discriminate H.
+Qed.
+
 (*
 Lemma shift_sup' : forall {vt nt}
     (g : @Grammar vt nt) (r r' l : vt*nat),
@@ -609,15 +674,30 @@ Proof.
 Qed.
 
 Lemma shift_cost_sup : forall {vt nt}
-    (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
-  shift g r' = Some (v, r) ->
-    costs g (sup' g r') = costs g (inf g v) + costs g (sup' g r).
+  (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
+    shift g r' = Some (v, r) ->
+      costs g (sup' g r') = costs g (inf g v) + costs g (sup' g r).
 Proof.
   intros vt nt g r r' v H.
   destruct (shift g r') as [(v', r'')|] eqn:E.
   - rewrite shift_sup with (r0 := r) (v0 := v).
     + rewrite <- costs_app. apply f_equal. reflexivity.
     + rewrite <- H. apply E.
+  - discriminate H.
+Qed.
+
+Lemma shift_cost_sup' : forall {vt nt}
+  (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
+    shift g r' = Some (v, r) ->
+      costs g (sup g v) = costs g (inf' g r') + costs g (sup' g r).
+Proof.
+  intros vt nt g r r' v H.
+  destruct (shift g r') as [(v', r'')|] eqn:E.
+  - injection H as H1 H2.
+    rewrite H1 in E. rewrite H2 in E.
+    apply (shift_sup' g r r' v) in E as E'.
+    rewrite E'.
+    rewrite costs_app. reflexivity.
   - discriminate H.
 Qed.
 
@@ -630,7 +710,26 @@ Definition amort_weight' {vt nt} (g : @Grammar vt nt) (r : vt*nat) : weight :=
   let n := fst r
   in tree_weight g n + min_arc_weight g (anchor g n) - costs g (sup' g r).
 
-Search (0 <= _).
+Lemma sup_destr : forall {vt nt}
+  (g : @Grammar vt nt) (v : vt) (x : nat) (l : list nat),
+    sup g v = x :: l ->
+      x = anchor g v /\ l = [].
+Proof.
+  intros vt nt g v x l.
+  intros H.
+  apply (app_pref_eq' _ _ (inf g v)) in H as H'.
+  rewrite inf_plus_sup in H'.
+  destruct (inf g v) eqn:E.
+  - simpl in H'.
+    inversion H'.
+    split.
+    + reflexivity.
+    + reflexivity.
+  - inversion H'.
+    destruct l0 eqn:E'.
+    + simpl in H2. discriminate H2.
+    + simpl in H2. discriminate H2.
+Qed.
 
 Lemma sup'_destr : forall {vt nt}
   (g : @Grammar vt nt) (r : vt*nat) (x : nat) (l : list nat),
@@ -696,7 +795,32 @@ Lemma shift_amort_weight' : forall {vt nt}
   shift g r = Some (v, r') ->
     amort_weight g v + costs g (inf' g r) = amort_weight' g r'.
 Proof.
-Admitted.
+  intros vt nt g r r' v H.
+  unfold amort_weight. unfold amort_weight'.
+  apply shift_preserves_tree_weight in H as H1.
+  rewrite <- H1.
+  apply shift_preserves_anchor in H as H2.
+  rewrite <- H2.
+  apply shift_cost_sup' in H as H3.
+  rewrite (minus_plus _ (costs g (sup g v))).
+  - rewrite H3. rewrite plus_minus. reflexivity.
+  - destruct (sup g v) eqn:E.
+    + unfold costs. simpl. apply le_0_n.
+    + apply sup_destr in E as [E1 E2].
+      rewrite E2. unfold costs.
+      simpl. unfold cost. rewrite plus_comm.
+      apply (combine_leb).
+        * apply min_tree_weight_leb.
+          rewrite E1. reflexivity.
+        * rewrite E1. reflexivity.
+Qed.
+
+(*
+Lemma shift_cost_sup' : forall {vt nt}
+  (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
+    shift g r' = Some (v, r) ->
+      costs g (sup g v) = costs g (inf' g r') + costs g (sup' g r).
+*)
 
 (** The list (=>set) of terminals inside the given span *)
 Fixpoint in_span (i j : term) : list term :=
@@ -934,17 +1058,6 @@ Proof.
       * rewrite L2' in E. apply E.
 Qed.
 
-Theorem rest_Sj : forall {vt nt} (g : @Grammar vt nt) (i j : term),
-  i <= j -> rest g i j = rest g i (S j) ++ [j].
-Proof. Admitted.
-(*
-  intros i j H.
-  simpl.
-  destruct (lebP i j) as [H'|H'].
-  - reflexivity.
-  - apply H' in H. destruct H.
-Qed. *)
-
 (* TODO: not correct! use in_vs_inside
 Lemma inf_complete_eq_in_span : forall {vt nt} 
   (g : @Grammar vt nt) r i j w t
@@ -954,6 +1067,17 @@ Lemma inf_complete_eq_in_span : forall {vt nt}
 Proof.
 Admitted.
 *)
+
+Lemma rest_Sj : forall {vt nt} (g : @Grammar vt nt) (i j : term),
+  i <= j -> rest g i j = rest g i (S j) ++ [j].
+Proof. Admitted.
+(*
+  intros i j H.
+  simpl.
+  destruct (lebP i j) as [H'|H'].
+  - reflexivity.
+  - apply H' in H. destruct H.
+Qed. *)
 
 Lemma cost_rest_min_in : forall {vt nt}
   (g : @Grammar vt nt) (i j k : term),
@@ -1011,7 +1135,7 @@ Proof.
     apply combine_leb.
     reflexivity.
     reflexivity.
-  - apply max_leb_split. split.
+  - apply Nat.max_lub_iff. split.
     + unfold total.
       rewrite <- plus_assoc.
       apply combine_leb. { reflexivity. }
