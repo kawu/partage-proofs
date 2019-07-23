@@ -85,7 +85,7 @@ Proof.
   - apply le_S. apply IHle.
 Qed.
 
-Lemma plus_leb : forall (x y z : nat),
+Lemma plus_leb_r : forall (x y z : nat),
   x <= y -> x + z <= y + z.
 Proof.
   intros x y z.
@@ -101,6 +101,11 @@ Proof.
     apply le_SS. apply H.
 Qed.
 
+Lemma plus_leb_l : forall (x y z : nat),
+  x + z <= y + z -> x <= y.
+Proof.
+Admitted.
+
 Lemma combine_leb : forall x1 y1 x2 y2 : nat,
   x1 <= y1 ->
   x2 <= y2 ->
@@ -110,8 +115,8 @@ Proof.
   intros H1 H2.
   transitivity (x1 + y2).
   - rewrite plus_comm. rewrite (plus_comm x1).
-    apply plus_leb. apply H2.
-  - apply plus_leb. apply H1.
+    apply plus_leb_r. apply H2.
+  - apply plus_leb_r. apply H1.
 Qed.
 
 Lemma lebP : forall n m, reflect (n <= m) (n <=? m).
@@ -194,6 +199,11 @@ Proof.
   - simpl. rewrite plus_0_r. reflexivity.
   - simpl. rewrite <- plus_Snm_nSm. simpl. apply IH.
 Qed.
+
+Theorem max_leb_split : forall x y z,
+  max x y <= z <-> x <= z /\ y <= z.
+Proof.
+Admitted.
 
 (** Tree Substitution Grammar parser, 1st try.
 *)
@@ -362,7 +372,7 @@ Record Grammar {vert non_term : Type} := mkGram
   ; shift : vert * nat -> option (vert * (vert * nat))
       (* shift the dot *)
 
-  (* various shift-related properties *)
+  (* various shift-related properties (and more) *)
   ; shift_preserves_head : forall r r' v,
       shift r = Some (v, r') ->
         fst r = fst r'
@@ -384,6 +394,16 @@ Record Grammar {vert non_term : Type} := mkGram
   ; no_shift_inf : forall r,
       shift r = None ->
         inf' r = inf (fst r)
+  ; term_inf : forall v i,
+      label v = Terminal i ->
+        inf v = [i]
+
+  ; shift_preserves_tree_weight : forall l v l',
+      shift l = Some (v, l') ->
+        tree_weight v = tree_weight (fst l')
+  ; shift_preserves_anchor : forall l v l',
+      shift l = Some (v, l') ->
+        anchor v = anchor (fst l')
   }.
 
 (** The list (=>set) of production rules in the grammar *)
@@ -549,6 +569,16 @@ Proof.
   - discriminate H.
 Qed.
 
+(*
+Lemma shift_sup' : forall {vt nt}
+    (g : @Grammar vt nt) (r r' l : vt*nat),
+  shift g r = Some (fst l, r') ->
+  shift g l = None ->
+    sup' g r' = inf' g l ++ sup' g r.
+Proof.
+Admitted.
+*)
+
 Lemma fold_left_plus : forall (x : nat) (l : list nat),
   fold_left plus l x = fold_left plus l 0 + x.
 Proof.
@@ -661,6 +691,13 @@ Proof.
         * rewrite E1. rewrite H'. reflexivity.
 Qed.
 
+Lemma shift_amort_weight' : forall {vt nt}
+    (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
+  shift g r = Some (v, r') ->
+    amort_weight g v + costs g (inf' g r) = amort_weight' g r'.
+Proof.
+Admitted.
+
 (** The list (=>set) of terminals inside the given span *)
 Fixpoint in_span (i j : term) : list term :=
   match j with
@@ -736,60 +773,66 @@ Qed.
 Definition rest {vt nt} (g : @Grammar vt nt) (i j : term) : list term :=
   in_span 0 (i - 1) ++ in_span (j + 1) (term_max g).
 
-
 Definition heuristic {vt nt}
   (g : @Grammar vt nt) (r : vt*nat) (i j : term) : weight :=
     amort_weight' g r + costs g (rest g i j).
+
+Definition total {vt nt}
+  (g : @Grammar vt nt) (r : vt*nat) (i j : term) (w : weight) : weight :=
+    w + heuristic g r i j.
 
 (** Chart items and the rules to infer them. *)
 Inductive item {vt nt} 
   : @Grammar vt nt
            -> vt*nat -> term -> term -> weight
-           -> weight (* value of the heuristic *)
+           (* -> weight (* value of the heuristic *) *)
            -> weight (* previous max total value *)
            -> Prop :=
   | axiom (g : @Grammar vt nt) (r : vt*nat) (i : term)
       (I: In r (rules g))
       (L: i <= term_max g) :
-        item g r i i 0 (heuristic g r i i) 0
+        item g r i i 0 0
   | scan (g : @Grammar vt nt)
-      (r r' : vt*nat) (i : term) (j : term) (v : vt) (w h _t : weight)
-      (P: item g r i j w h _t)
+      (r r' : vt*nat) (i : term) (j : term) (v : vt) (w _t : weight)
+      (P: item g r i j w _t)
       (L: j <= term_max g)
       (* (E: fmap (label g) (lead g r) = Some (terminal j)) : *)
       (E1: shift g r = Some (v, r'))
       (E2: label g v = Terminal j) :
-        item g r' i (S j) w (heuristic g r' i (S j)) 0
+        item g r' i (S j) w (*(heuristic g r' i (S j))*)
+          (total g r i j w)
   | pseudo_subst
-      (g : @Grammar vt nt) (l r l' : vt*nat) (i j k : term) (w1 w2 h1 h2 _t1 _t2 : weight)
-      (LP: item g l i j w1 h1 _t1)
-      (RP: item g r j k w2 h2 _t2)
+      (g : @Grammar vt nt) (l r l' : vt*nat) (i j k : term) (w1 w2 _t1 _t2 : weight)
+      (LP: item g l i j w1 _t1)
+      (RP: item g r j k w2 _t2)
       (L: shift g r = None)
       (E: shift g l = Some (fst r, l')) :
-        item g l' i k (w1 + w2) (heuristic g l' i k) 0
+        item g l' i k (w1 + w2) (*(heuristic g l' i k)*)
+          (max (total g l i j w1) (total g r j k w2))
   | subst
       (g : @Grammar vt nt) (l r l' : vt*nat) (i j k : term) (v : vt)
-      (w1 w2 h1 h2 _t1 _t2 : weight)
-      (LP: item g l i j w1 h1 _t1)
-      (RP: item g r j k w2 h2 _t2)
+      (w1 w2 _t1 _t2 : weight)
+      (LP: item g l i j w1 _t1)
+      (RP: item g r j k w2 _t2)
       (L1: shift g r = None)
       (L2: root g (fst r) = true)
       (L3: shift g l = Some (v, l'))
       (L4: leaf g v = true)
       (E: label g v = label g (fst r)) :
-        item g l' i k (w1 + w2 + omega g (fst r) (fst l)) (heuristic g l' i k) 0.
+        item g l' i k (w1 + w2 + omega g (fst r) (fst l)) (*(heuristic g l' i k)*)
+          (max (total g l i j w1) (total g r j k w2)).
 
-Theorem item_i_leb_j : forall {vt nt} r i j w h t
-  (g : @Grammar vt nt) (H: @item vt nt g r i j w h t),
+Theorem item_i_leb_j : forall {vt nt} r i j w t (g : @Grammar vt nt)
+  (H: @item vt nt g r i j w t),
     i <= j.
 Proof.
-  intros vt nt r i j w h t g.
+  intros vt nt r i j w t g.
   intros eta.
   induction eta
     as [ g r' i' I L
-       | g r1 r2 i' j' v w' h' _t' P IHP L E1 E2
-       | g l r' l' i' j' k w1 w2 h1 h2 _t1 _t2 LP IHL RP IHP L E
-       | g l r l' i j k v w1 w2 h1 h2 _t1 _t2 LP IHL RP IHP L1 L2 L3 L4 E
+       | g r1 r2 i' j' v w' _t' P IHP L E1 E2
+       | g l r' l' i' j' k w1 w2 _t1 _t2 LP IHL RP IHP L E
+       | g l r l' i j k v w1 w2 _t1 _t2 LP IHL RP IHP L1 L2 L3 L4 E
        ].
   - reflexivity.
   - apply le_S. apply IHP.
@@ -827,26 +870,26 @@ Proof.
   apply R.
 Qed.
 
-Theorem in_vs_inside : forall {vt nt} r i j w h t
-  (g : @Grammar vt nt) (H: @item vt nt g r i j w h t),
+Theorem in_vs_inside : forall {vt nt} r i j w t
+  (g : @Grammar vt nt) (H: @item vt nt g r i j w t),
     costs g (in_span i j) <= w + costs g (inf' g r).
 Proof.
-  intros vt nt r i j w h t g.
+  intros vt nt r i j w t g.
   intros eta.
   induction eta
     as [ g r' i' I L
-       | g r1 r2 i' j' v w' h' _t' P IHP L E1 E2
-       | g l r' l' i' j' k w1 w2 h1 h2 _t1 _t2 LP IHL RP IHP L E
-       | g l r l' i j k v w1 w2 h1 h2 _t1 _t2 LP IHL RP IHP L1 L2 L3 L4 E
+       | g r1 r2 i' j' v w' _t' P IHP L E1 E2
+       | g l r' l' i' j' k w1 w2 _t1 _t2 LP IHL RP IHP L E
+       | g l r l' i j k v w1 w2 _t1 _t2 LP IHL RP IHP L1 L2 L3 L4 E
        ].
   - simpl. rewrite in_span_ii_empty.
     unfold costs. simpl. apply le_0_n.
   - rewrite in_span_Sj.
-    Focus 2. apply (item_i_leb_j r1 i' j' w' h' _t' g). apply P.
+    Focus 2. apply (item_i_leb_j r1 i' j' w' _t' g). apply P.
     rewrite (shift_term_inf g r1 r2 v j').
     + rewrite costs_app. rewrite costs_app.
       rewrite plus_assoc.
-      apply (plus_leb _ _ (costs g [j'])).
+      apply (plus_leb_r _ _ (costs g [j'])).
       apply IHP.
     + apply E1.
     + apply E2.
@@ -879,7 +922,7 @@ Proof.
     + transitivity (w2 + costs g (inf' g r)).
       * apply IHP.
       * rewrite (plus_comm w2). rewrite (plus_comm w2).
-        apply plus_leb.
+        apply plus_leb_r.
         apply (inf_cost_vs_omega' g r (fst l)).
         { apply L1. } { apply L2. }
     + apply root_has_non_term in L2 as L2'.
@@ -891,11 +934,145 @@ Proof.
       * rewrite L2' in E. apply E.
 Qed.
 
-
+Theorem rest_Sj : forall {vt nt} (g : @Grammar vt nt) (i j : term),
+  i <= j -> rest g i j = rest g i (S j) ++ [j].
+Proof. Admitted.
 (*
-Theorem monotonic : forall {vt nt} r i j w h t
-  (g : @Grammar vt nt) (H: @item vt nt r i j w h t),
-    t <= w + h.
+  intros i j H.
+  simpl.
+  destruct (lebP i j) as [H'|H'].
+  - reflexivity.
+  - apply H' in H. destruct H.
+Qed. *)
+
+(* TODO: not correct! use in_vs_inside
+Lemma inf_complete_eq_in_span : forall {vt nt} 
+  (g : @Grammar vt nt) r i j w t
+  (I: @item vt nt g r i j w t),
+    shift g r = None ->
+      inf g (fst r) = in_span i j.
 Proof.
 Admitted.
 *)
+
+Lemma cost_rest_min_in : forall {vt nt}
+  (g : @Grammar vt nt) (i j k : term),
+    costs g (rest g i k) = costs g (rest g i j) - costs g (in_span j k).
+Proof.
+Admitted.
+
+Lemma cost_rest_plus_in_l : forall {vt nt}
+  (g : @Grammar vt nt) (i j k : term),
+    costs g (rest g j k) = costs g (in_span i j) + costs g (rest g i k).
+Proof.
+Admitted.
+
+Lemma cost_rest_plus_in_r : forall {vt nt}
+  (g : @Grammar vt nt) (i j k : term),
+    costs g (rest g i j) = costs g (rest g i k) + costs g (in_span j k).
+Proof.
+Admitted.
+
+Lemma amort_weight_complete : forall {vt nt}
+  (g : @Grammar vt nt) (r : vt*nat),
+    shift g r = None ->
+      amort_weight g (fst r) = amort_weight' g r.
+Proof.
+Admitted.
+
+Theorem monotonic : forall {vt nt} r i j w t
+  (g : @Grammar vt nt) (H: @item vt nt g r i j w t),
+    t <= w + heuristic g r i j.
+Proof.
+  intros vt nt r i j w t g.
+  intros eta.
+  (* TODO: don't really need to use induction here! *)
+  induction eta
+    as [ g r' i' I L
+       | g r1 r2 i' j' v w' _t' P IHP L E1 E2
+       | g l r' l' i' j' k w1 w2 _t1 _t2 LP IHL RP IHP L E
+       | g l r l' i j k v w1 w2 _t1 _t2 LP IHL RP IHP L1 L2 L3 L4 E
+       ].
+  - simpl. apply Peano.le_0_n.
+  - unfold total.
+    rewrite (plus_comm w'). rewrite (plus_comm w').
+    apply plus_leb_r.
+    unfold heuristic.
+    apply shift_amort_weight in E1 as E1'.
+    rewrite E1'.
+    rewrite <- plus_assoc.
+    apply combine_leb. reflexivity.
+    apply (item_i_leb_j r1 i' j' w') in P as P'.
+    apply (rest_Sj g) in P'.
+    rewrite P'.
+    rewrite costs_app.
+    apply term_inf in E2. rewrite E2.
+    rewrite plus_comm.
+    apply combine_leb.
+    reflexivity.
+    reflexivity.
+  - apply max_leb_split. split.
+    + unfold total.
+      rewrite <- plus_assoc.
+      apply combine_leb. { reflexivity. }
+      unfold heuristic.
+      apply shift_amort_weight in E as E'.
+      rewrite E'.
+      rewrite <- plus_assoc. rewrite (plus_comm w2).
+      rewrite <- plus_assoc.
+      apply combine_leb. { reflexivity. }
+      rewrite (cost_rest_plus_in_r g i' j' k).
+      rewrite (plus_comm _ (costs g (rest g i' k))).
+      rewrite <- plus_assoc.
+      apply combine_leb. { reflexivity. }
+      rewrite <- shift_inf_passive.
+      Focus 2. apply L.
+      rewrite plus_comm.
+      apply (in_vs_inside r' j' k w2 _t2).
+      apply RP.
+    + unfold total.
+      rewrite (plus_comm w1).
+      rewrite <- plus_assoc.
+      apply combine_leb. { reflexivity. }
+      unfold heuristic.
+      rewrite (cost_rest_plus_in_l g i' j' k).
+      rewrite plus_assoc. rewrite plus_assoc.
+      apply combine_leb. Focus 2. reflexivity.
+      rewrite (plus_comm w1).
+      apply (plus_leb_l _ _ (costs g (inf' g l))).
+      rewrite <- (plus_assoc _ w1).
+      rewrite (plus_comm (amort_weight' g r')).
+      rewrite (plus_comm (amort_weight' g l')).
+      rewrite <- (plus_assoc).
+      apply combine_leb.
+      * apply (in_vs_inside l _ _ _ _t1). apply LP.
+      * apply amort_weight_complete in L as L'.
+        rewrite <- L'.
+        apply shift_amort_weight' in E as E'.
+        rewrite E'. reflexivity.
+
+(*
+        unfold amort_weight'.
+        apply shift_preserves_tree_weight in E as E1.
+        apply shift_preserves_anchor in E as E2.
+        rewrite E1. rewrite E2.
+        rewrite (minus_plus
+          (tree_weight g (fst l') + min_arc_weight g (anchor g (fst l')))
+          (costs g (sup' g r'))).
+        { apply (shift_sup' g) in E as E3.
+          Focus 2. apply L.
+          rewrite E3.
+          rewrite costs_app.
+          rewrite 
+
+      unfold amort_weight'.
+
+      apply shift_amort_weight in E as E'.
+      rewrite E'.
+*)
+Qed.
+
+
+
+
+
