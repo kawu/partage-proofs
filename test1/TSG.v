@@ -1,41 +1,9 @@
-(** * Maps: Total and Partial Maps *)
-
-(** _Maps_ (or _dictionaries_) are ubiquitous data structures both
-    generally and in the theory of programming languages in
-    particular; we're going to need them in many places in the coming
-    chapters.  They also make a nice case study using ideas we've seen
-    in previous chapters, including building data structures out of
-    higher-order functions (from [Basics] and [Poly]) and the use of
-    reflection to streamline proofs (from [IndProp]).
-
-    We'll define two flavors of maps: _total_ maps, which include a
-    "default" element to be returned when a key being looked up
-    doesn't exist, and _partial_ maps, which return an [option] to
-    indicate success or failure.  The latter is defined in terms of
-    the former, using [None] as the default element. *)
-
-(* ################################################################# *)
-(** * The Coq Standard Library *)
-
-(** One small digression before we begin...
-
-    Unlike the chapters we have seen so far, this one does not
-    [Require Import] the chapter before it (and, transitively, all the
-    earlier chapters).  Instead, in this chapter and from now, on
-    we're going to import the definitions and theorems we need
-    directly from Coq's standard library stuff.  You should not notice
-    much difference, though, because we've been careful to name our
-    own definitions and theorems the same as their counterparts in the
-    standard library, wherever they overlap. *)
-
 From Coq Require Import Arith.Arith.
 From Coq Require Import Bool.Bool.
 Require Export Coq.Strings.String.
 From Coq Require Import Logic.FunctionalExtensionality.
 From Coq Require Import Lists.List.
 Import ListNotations.
-
-(* From LF Require Import Maps. *)
 
 Fixpoint cat_maybes {A : Type} (l : list (option A)) : list A :=
   match l with
@@ -374,7 +342,7 @@ Record Grammar {vert non_term : Type} := mkGram
       shift r = Some (v, r') ->
       leaf v = true ->
       label v = NonTerm x ->
-        inf' r' = inf' r
+        inf v = [] /\ inf' r' = inf' r
   ; no_shift_inf : forall r,
       shift r = None ->
         inf' r = inf (fst r)
@@ -389,6 +357,7 @@ Record Grammar {vert non_term : Type} := mkGram
       shift l = Some (v, l') ->
         anchor v = anchor (fst l')
   }.
+
 
 Lemma inf'_tail_empty : forall {vt nt}
   (g : @Grammar vt nt) (r : vt * nat) x l,
@@ -1212,11 +1181,38 @@ Proof.
         { apply L1. } { apply L2. }
     + apply root_has_non_term in L2 as L2'.
       destruct L2' as [x L2'].
+      apply (shift_non_term_leaf_inf _ _ _ _ x) in L3 as [L5 L6].
+      * rewrite L6. apply IHL.
+      * apply L4.
+      * rewrite L2' in E. apply E.
+(*
       rewrite (shift_non_term_leaf_inf g l l' v x).
       * apply IHL.
       * apply L3.
       * apply L4.
-      * rewrite L2' in E. apply E.
+      * rewrite L2' in E. apply E. *)
+Qed.
+
+Theorem in_vs_inside_root : forall {vt nt} r v i j w t
+  (g : @Grammar vt nt) (H: @item vt nt g r i j w t),
+    root g (fst r) = true ->
+    shift g r = None ->
+      costs g (in_span i j) <= w + omega g (fst r) v.
+Proof.
+  intros vt nt r v i j w t g I R N.
+  transitivity (w + costs g (inf' g r)).
+  - apply (in_vs_inside _ _ _ _ t). apply I.
+  - apply combine_leb. { reflexivity. }
+    apply (inf_root_anchor) in R as A.
+    apply shift_inf_passive in N as E.
+    rewrite <- E in A.
+    rewrite A.
+    unfold costs. simpl.
+    unfold omega.
+    unfold cost.
+    apply combine_leb.
+    + apply min_arc_weight_leb.
+    + apply min_tree_weight_leb. reflexivity.
 Qed.
 
 (* TODO: not correct! use in_vs_inside
@@ -1242,6 +1238,32 @@ Proof.
   rewrite H. reflexivity.
 Qed.
 
+
+Lemma root_non_term : forall {vt nt}
+  (g : @Grammar vt nt) v,
+    root g v = true ->
+      exists x, label g v = NonTerm x.
+Proof.
+Admitted.
+
+Lemma costs_nil :  forall {vt nt}
+  (g : @Grammar vt nt),
+    costs g [] = 0.
+Proof.
+  intros vt nt g.
+  unfold costs. simpl. reflexivity.
+Qed.
+
+Lemma sup'_root : forall {vt nt}
+  (g : @Grammar vt nt) r,
+    root g (fst r) = true ->
+    shift g r = None ->
+      sup' g r = [].
+Proof.
+Admitted.
+
+Search (_ - 0).
+
 Theorem monotonic : forall {vt nt} r i j w t
   (g : @Grammar vt nt) (H: @item vt nt g r i j w t),
     t <= w + heuristic g r i j.
@@ -1257,7 +1279,7 @@ Proof.
        ].
 
   - (* AX *)
-    simpl. apply Peano.le_0_n.
+    simpl. apply le_0_n.
 
   - (* SC *)
     unfold total.
@@ -1308,8 +1330,10 @@ Proof.
       unfold heuristic.
       rewrite (cost_rest_plus_in_l g i' j' k).
         Focus 2. apply item_i_leb_j in LP. apply LP.
+
       rewrite plus_assoc. rewrite plus_assoc.
       apply combine_leb. Focus 2. reflexivity.
+
       rewrite (plus_comm w1).
       apply (plus_leb_l _ _ (costs g (inf' g l))).
       rewrite <- (plus_assoc _ w1).
@@ -1323,25 +1347,92 @@ Proof.
         apply shift_amort_weight' in E as E'.
         rewrite E'. reflexivity.
 
-(*
-        unfold amort_weight'.
-        apply shift_preserves_tree_weight in E as E1.
-        apply shift_preserves_anchor in E as E2.
-        rewrite E1. rewrite E2.
-        rewrite (minus_plus
-          (tree_weight g (fst l') + min_arc_weight g (anchor g (fst l')))
-          (costs g (sup' g r'))).
-        { apply (shift_sup' g) in E as E3.
-          Focus 2. apply L.
-          rewrite E3.
-          rewrite costs_app.
-          rewrite 
+  - (* SU *)
 
-      unfold amort_weight'.
+    apply root_non_term in L2 as H.
+    destruct H as [x RNonTerm].
+    apply (shift_non_term_leaf_inf g l l' v x) in L3 as H.
+    destruct H as [InfVEmpty InfLEq].
+    Focus 2. apply L4.
+    Focus 2. rewrite RNonTerm in E. apply E.
 
-      apply shift_amort_weight in E as E'.
-      rewrite E'.
-*)
+    apply Nat.max_lub_iff. split.
+
+    + unfold total.
+      rewrite <- plus_assoc. rewrite <- plus_assoc.
+      apply combine_leb. { reflexivity. }
+      unfold heuristic.
+      apply shift_amort_weight in L3 as L5.
+      rewrite L5.
+
+      (* [costs g (inf g v)] is 0 because v is a non-terminal leaf *)
+      rewrite InfVEmpty. rewrite costs_nil.
+      rewrite <- plus_n_O.
+
+      (* get rid of [amort_weight' g l] on both sides *)
+      rewrite (plus_comm w2).
+      rewrite (plus_comm (omega _ _ _)).
+      rewrite <- plus_assoc. rewrite <- plus_assoc.
+      apply combine_leb. { reflexivity. }
+
+      rewrite (cost_rest_plus_in_r g i j k).
+      * apply combine_leb. { reflexivity. }
+        rewrite plus_comm.
+        apply (in_vs_inside_root _ _ _ _ _ _t2).
+        Focus 2. apply L2. Focus 2. apply L1.
+        apply RP.
+      * apply item_i_leb_j in RP. apply RP.
+      * apply item_j_leb_term_max in RP. apply RP.
+
+    + unfold total.
+
+      rewrite (plus_comm w1).
+      rewrite <- plus_assoc. rewrite <- plus_assoc.
+      apply combine_leb. { reflexivity. }
+
+      unfold heuristic.
+
+      rewrite (cost_rest_plus_in_l g i j k).
+        Focus 2. apply item_i_leb_j in LP. apply LP.
+
+      rewrite plus_assoc. rewrite plus_assoc. rewrite plus_assoc.
+      apply combine_leb. Focus 2. reflexivity.
+
+      rewrite plus_comm.
+      apply (plus_leb_l _ _ (costs g (inf' g l))).
+      rewrite <- plus_assoc.
+
+      (* put everything in the right order *)
+      rewrite <- plus_assoc.
+      rewrite (plus_comm (amort_weight' g l')).
+      rewrite (plus_assoc (w1 + omega g (fst r) (fst l))).
+      rewrite <- (plus_assoc w1).
+      rewrite (plus_comm (omega _ _ _)).
+      rewrite (plus_assoc w1).
+      rewrite <- plus_assoc.
+
+      apply combine_leb.
+      * apply (in_vs_inside l _ _ _ _t1). apply LP.
+      * apply combine_leb.
+        { unfold amort_weight'. unfold omega.
+          rewrite (plus_comm (arc_weight _ _ _)).
+          apply sup'_root in L2 as Rnil.
+          Focus 2. apply L1.
+          rewrite Rnil.
+          assert (C0: costs g [] = 0).
+            { unfold costs. simpl. reflexivity. }
+          rewrite C0. rewrite <- minus_n_O.
+          apply combine_leb. { reflexivity. }
+          apply min_arc_weight_leb. }
+        { apply shift_amort_weight' in L3 as E'.
+          rewrite <- E'. rewrite plus_comm.
+          assert (H: forall x y, x <= x + y).
+            { intros a b. rewrite (plus_n_O a).
+              apply combine_leb.
+              - rewrite <- plus_n_O. reflexivity.
+              - apply le_0_n. }
+          apply H. }
+
 Qed.
 
 
