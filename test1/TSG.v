@@ -171,7 +171,7 @@ Proof.
         apply plus_leb_r.
         apply (inf_cost_vs_omega' g r (fst l)).
         { apply L1. } { apply L2. }
-    + apply root_has_non_term in L2 as L2'.
+    + apply root_non_term in L2 as L2'.
       destruct L2' as [x L2'].
       apply (shift_non_term_leaf_inf _ _ _ _ x) in L3 as [L5 L6].
       * rewrite L6. apply IHL.
@@ -209,12 +209,12 @@ Theorem monotonic : forall {vt nt} r i j w t
 Proof.
   intros vt nt r i j w t g.
   intros eta.
-  (* TODO: don't really need to use induction here! *)
-  induction eta
+
+  destruct eta
     as [ g r' i' I L
-       | g r1 r2 i' j' v w' _t' P IHP L E1 E2
-       | g l r' l' i' j' k w1 w2 _t1 _t2 LP IHL RP IHP L E
-       | g l r l' i j k v w1 w2 _t1 _t2 LP IHL RP IHP L1 L2 L3 L4 E
+       | g r1 r2 i' j' v w' _t' P L E1 E2
+       | g l r' l' i' j' k w1 w2 _t1 _t2 LP RP L E
+       | g l r l' i j k v w1 w2 _t1 _t2 LP RP L1 L2 L3 L4 E
        ].
 
   - (* AX *)

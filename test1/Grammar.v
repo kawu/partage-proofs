@@ -20,21 +20,15 @@ Definition weight := nat.
 
 (** Grammar representation.
 
-The grammar must satisfy certain additional constraints, not encoded
-in the representation below.  For example:
-* The set of terminals in [rule_set] is the same as in [term_set].
-* The set of terminals [term_set] is indeed a set (even though
-  it is represented by a list).
-* The set of dotted rules [dotted_set] directly steps from [rule_set].
+* [vert] -- type of vertex (node)
+* [non_term] -- non-terminal type
 
-We also don't care what are the values of the functions such as [label],
-[root], or [tree_weight] for the arguments outside of the underlying
-domains.
+Making the grammar [vert] polymorphic makes it safe to specify
+the grammar in terms of total functions ([root], [leaf]).
 
-The fact that we do not directly encode these constraints should
-not be a problem.  If we manage to prove a property for the
-grammars in general, it should also hold for a grammar with all
-the well-formedness constraints satisfied.
+Whatever we prove for this grammar representation should also hold
+in the case where the vertex set is finite, since [vert] can be
+in general instantiated with a simple, finite type.
 
 *)
 Record Grammar {vert non_term : Type} := mkGram
@@ -58,7 +52,7 @@ Record Grammar {vert non_term : Type} := mkGram
       (* node labeling function (either non-terminal or terminal
          is assigned to each vertex) *)
 
-  ; root_has_non_term : forall v,
+  ; root_non_term : forall v,
       root v = true ->
         exists x, label v = NonTerm x
       (* label assigned to a root is a non-terminal *)
@@ -377,12 +371,18 @@ Proof.
 Qed.
 
 
-Lemma root_non_term : forall {vt nt}
+Lemma sup_root : forall {vt nt}
   (g : @Grammar vt nt) v,
     root g v = true ->
-      exists x, label g v = NonTerm x.
+      sup g v = [].
 Proof.
-Admitted.
+  intros vt nt g v H.
+  apply (app_pref_eq _ _ (inf g v)).
+  apply inf_root_anchor in H.
+  rewrite inf_plus_sup.
+  rewrite app_nil_r.
+  rewrite <- H. reflexivity.
+Qed.
 
 
 Lemma sup'_root : forall {vt nt}
@@ -391,4 +391,9 @@ Lemma sup'_root : forall {vt nt}
     shift g r = None ->
       sup' g r = [].
 Proof.
-Admitted.
+  intros vt nt g r H1 H2.
+  apply sup_root in H1.
+  apply shift_sup_passive in H2.
+  rewrite H1 in H2.
+  apply H2.
+Qed.
