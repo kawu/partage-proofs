@@ -5,200 +5,11 @@ From Coq Require Import Logic.FunctionalExtensionality.
 From Coq Require Import Lists.List.
 Import ListNotations.
 
-Fixpoint cat_maybes {A : Type} (l : list (option A)) : list A :=
-  match l with
-  | [] => []
-  | Some h :: t => h :: cat_maybes t
-  | None :: t => cat_maybes t
-  end.
+From LF Require Import Utils.
+From LF Require Import LE.
+From LF Require Import App.
 
-Definition map_maybe {A B : Type} (f : A -> option B) (l : list A) : list B :=
-  cat_maybes (map f l).
-
-Fixpoint drop {A : Type} (k : nat) (l : list A) : list A :=
-  match k, l with
-  | 0, _ => l
-  | _, _ :: t => drop (k-1) t
-  | _, [] => []
-  end.
-
-(** Minimum nat *)
-Fixpoint minimum (xs : list nat) : option nat :=
-  match xs with
-  | [] => None
-  | x :: t =>
-    match minimum t with
-    | None => Some x
-    | Some y => Some (min x y)
-    end
-  end.
-
-(** Maximum nat *)
-Fixpoint maximum (xs : list nat) : option nat :=
-  match xs with
-  | [] => None
-  | x :: t =>
-    match maximum t with
-    | None => Some x
-    | Some y => Some (max x y)
-    end
-  end.
-
-Lemma le_SS : forall n m,
-  n <= m -> S n <= S m.
-Proof.
-  intros n m H.
-  induction H.
-  - apply le_n.
-  - apply le_S. apply IHle.
-Qed.
-
-Lemma plus_leb_r : forall (x y z : nat),
-  x <= y -> x + z <= y + z.
-Proof.
-  intros x y z.
-  generalize dependent y.
-  generalize dependent x.
-  induction z as [|z' IH].
-  - intros x y. intros H.
-    rewrite plus_0_r. rewrite plus_0_r. apply H.
-  - intros x y. intros H.
-    rewrite <- plus_Snm_nSm.
-    rewrite <- plus_Snm_nSm.
-    apply IH.
-    apply le_SS. apply H.
-Qed.
-
-Lemma plus_leb_l : forall (x y z : nat),
-  x + z <= y + z -> x <= y.
-Proof.
-  intros x y z.
-  generalize dependent y.
-  generalize dependent x.
-  induction z as [|z' IH].
-  - intros x y. intros H.
-    rewrite plus_0_r in H.
-    rewrite plus_0_r in H.
-    apply H.
-  - intros x y. intros H.
-    rewrite <- plus_Snm_nSm in H.
-    rewrite <- plus_Snm_nSm in H.
-    apply IH in H.
-    inversion H.
-    + reflexivity.
-    + transitivity (S x).
-      * apply le_S. reflexivity.
-      * apply H1.
-Qed.
-
-Lemma combine_leb : forall x1 y1 x2 y2 : nat,
-  x1 <= y1 ->
-  x2 <= y2 ->
-    x1 + x2 <= y1 + y2.
-Proof.
-  intros x1 y1 x2 y2.
-  intros H1 H2.
-  transitivity (x1 + y2).
-  - rewrite plus_comm. rewrite (plus_comm x1).
-    apply plus_leb_r. apply H2.
-  - apply plus_leb_r. apply H1.
-Qed.
-
-Lemma lebP : forall n m, reflect (n <= m) (n <=? m).
-Proof.
-  intros n m. apply iff_reflect. split.
-  - intros H. apply leb_correct. apply H.
-  - intros H. apply leb_complete. apply H.
-Qed.
-
-Lemma O_leb_O : forall i,
-  i <= 0 -> i = 0.
-Proof.
-  intros i.
-  intros H.
-  inversion H.
-  reflexivity.
-Qed.
-
-Lemma leb_trans : forall i j k,
-  i <= j -> j <= k ->
-    i <= k.
-Proof.
-  intros i j k.
-  intros H1 H2.
-  transitivity j.
-  - apply H1.
-  - apply H2.
-Qed.
-
-Lemma app_suf_eq : forall {A : Type} (xs : list A) ys zs,
-  xs = ys -> xs ++ zs = ys ++ zs.
-Proof.
-  intros A xs ys zs.
-  intros H.
-  rewrite H.
-  reflexivity.
-Qed.
-
-Lemma app_pref_eq : forall {A : Type} (l l' pref : list A),
-  pref ++ l = pref ++ l' -> l = l'.
-Proof.
-  intros A l l' pref.
-  induction pref as [|h t].
-  - simpl. intros H. apply H.
-  - intros H. rewrite <- app_comm_cons in H. rewrite <- app_comm_cons in H.
-    injection H as H. apply IHt in H. apply H.
-Qed.
-
-Lemma app_pref_eq' : forall {A : Type} (l l' pref : list A),
-  l = l' -> pref ++ l = pref ++ l'.
-Proof.
-  intros A l l' pref.
-  intros H.
-  rewrite H.
-  reflexivity.
-Qed.
-
-Lemma app_pref_eq_r' : forall {A : Type} (l l' pref : list A),
-  l = l' -> l ++ pref = l' ++ pref.
-Proof.
-  intros A l l' pref.
-  intros H.
-  rewrite H.
-  reflexivity.
-Qed.
-
-Lemma minus_plus : forall x y z,
-  y <= x ->
-    (x - y) + z = (x + z) - y.
-Proof.
-  intros x y z. intros H.
-  induction z as [|z' IH].
-  - rewrite plus_0_r. rewrite plus_0_r. reflexivity.
-  - rewrite Nat.add_succ_r.
-    rewrite Nat.add_succ_r.
-    rewrite IH.
-    rewrite minus_Sn_m.
-    + reflexivity.
-    + transitivity x.
-      * apply H.
-      * apply le_plus_l.
-Qed.
-
-Lemma plus_minus : forall x y z,
-  (x + y) - (y + z) = x - z.
-Proof.
-  intros x y z.
-  induction y as [|y' IH].
-  - simpl. rewrite plus_0_r. reflexivity.
-  - simpl. rewrite <- plus_Snm_nSm. simpl. apply IH.
-Qed.
-
-(** Tree Substitution Grammar parser, 1st try.
-*)
-
-
-(** Termina (position) in the input sentence *)
+(** Terminal (position) in the input sentence *)
 Definition term := nat.
 
 Inductive symbol {nt t} : Type :=
@@ -207,14 +18,6 @@ Inductive symbol {nt t} : Type :=
 
 (* Weight; eventually should be represented by a real number? *)
 Definition weight := nat.
-
-(* fmap for an option *)
-Definition fmap
-  {A B : Type} (f : A -> B) (x : option A) : option B :=
-  match x with
-  | None => None
-  | Some v => Some (f v)
-  end.
 
 (** Grammar representation.
 
@@ -253,7 +56,8 @@ Record Grammar {vert non_term : Type} := mkGram
   ; anchor : vert -> term
       (* anchor terminal of the ET containing the given node *)
   ; label : vert -> @symbol non_term term
-      (* node labeling function *)
+      (* node labeling function (either non-terminal or terminal
+         is assigned to each vertex) *)
 
   ; root_has_non_term : forall v,
       root v = true ->
@@ -264,13 +68,6 @@ Record Grammar {vert non_term : Type} := mkGram
       (* parent of the given vertex (root => None) *)
   ; children : vert -> list vert
       (* the list of children of the given vertex (leaf => nil) *)
-
-(*
-  ; rule_for : vert -> @rule vert
-      (* production rule for the given vertex 
-         NOTE: returns a trivial rule for a leaf; we don't
-         use such rules our inference system! (but we could...) *)
-*)
 
   ; inf : vert -> list term
       (* the list (=>set) of terminals under and in the given node. *)
@@ -378,14 +175,6 @@ Proof.
     + simpl in H. discriminate H.
 Qed.
 
-(*
-Lemma inf_tail_empty : forall {vt nt}
-  (g : @Grammar vt nt) v x l,
-    inf g v = x :: l ->
-      l = [].
-Proof.
-Admitted. *)
-
 Lemma shift_one_empty :  forall {vt nt}
   (g : @Grammar vt nt) (r r' : vt * nat) v,
       shift g r = Some (v, r') ->
@@ -471,21 +260,6 @@ Definition rules {vt nt} (g : @Grammar vt nt) : list (vt*nat) :=
   in
     map_maybe f (vertices g).
 
-(*
-(** The last position in the sentence *)
-Definition term_max {vt nt} (g : @Grammar vt nt) : term :=
-  match maximum (terminals g) with
-  | None => 0 (* WARNING: this should never happen! *)
-  | Some x => x
-  end.
-*)
-
-(*
-(** Weight of the ET with the given rule *)
-Definition rule_weight {vt nt}
-    (g : @Grammar vt nt) (r : vt * nat) : weight :=
-  tree_weight g (fst r). *)
-
 (** Weight of the given (dependent, head) arc +
     weight of the dependent ET
 *)
@@ -494,28 +268,9 @@ Definition omega {vt nt}
   arc_weight g (anchor g dep) (anchor g gov) +
   tree_weight g dep.
 
-(*
-(** Weight of the ET with the given rule, provided that it contains
-    the given terminal anchor terminal. *)
-Definition rule_with_term_weight {vt nt}
-    (g : @Grammar vt nt) (t : term) (r : vt * nat) : option weight :=
-  if anchor g (fst r) =? t
-  then Some (rule_weight g r)
-  else None. *)
-
 (** The minimal cost of scanning the given terminal *)
 Definition cost {vt nt} (g : @Grammar vt nt) (t : term) : weight :=
   min_arc_weight g t + min_tree_weight g t.
-
-(*
-(** The minimal cost of scanning the given terminal *)
-Definition cost {vt nt}
-    (g : @Grammar vt nt) (t : term) : weight :=
-  match minimum (cat_maybes (map (rule_with_term_weight g t) (rules g))) with
-  | None => 0
-  | Some x => x
-  end.
-*)
 
 (** The minimal cost of scanning the given list of terminals *)
 Definition costs {vt nt}
@@ -532,80 +287,6 @@ Proof.
   rewrite inf_plus_sup'.
   rewrite H. reflexivity.
 Qed.
-
-(*
-Definition shift {vt nt}
-    (g : @Grammar vt nt) (r : vt*nat) : option (vt * (vt*nat)) :=
-  match r with
-  | (v, k) =>
-      match drop k (children g v) with
-      | v' :: t => Some (v', (v, k+1))
-      | [] => None
-      end
-  end.
-*)
-
-Definition lead {vt nt}
-    (g : @Grammar vt nt) (r : vt*nat) : option vt :=
-  match shift g r with
-  | Some (v, _) => Some v
-  | None => None
-  end.
-
-(*
-Axiom shift_inf : forall {vt nt}
-    (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
-  shift g r = Some (v, r') ->
-    inf' g r ++ inf g v = inf' g r'.
-
-Lemma shift_inf_passive : forall {vt nt} (g : @Grammar vt nt) r,
-  shift g r = None -> 
-    inf' g r = inf g (fst r).
-Proof.
-Admitted.
-
-Lemma shift_term_inf : forall {vt nt} (g : @Grammar vt nt) r r' v i,
-  shift g r = Some (v, r') ->
-  label g v = Terminal i ->
-    inf' g r' = inf' g r ++ [i].
-Proof.
-  intros vt nt g r r' v i.
-  intros H1 H2.
-  apply shift_inf in H1 as H3.
-  (* At this point we need to know that [inf leaf]
-     is simply defined in terms of the symbol in the [leaf].
-  *)
-Admitted.
-
-Lemma shift_non_term_leaf_inf : forall {vt nt} (g : @Grammar vt nt) r r' v x,
-  shift g r = Some (v, r') ->
-  leaf g v = true ->
-  label g v = NonTerm x ->
-    inf' g r' = inf' g r.
-Proof.
-Admitted.
-
-
-Lemma no_shift_inf : forall {vt nt} (g : @Grammar vt nt) r,
-  shift g r = None ->
-    inf' g r = inf g (fst r).
-Proof.
-Admitted.
-*)
-
-(*
-Lemma shift_preserves_head : forall {vt nt}
-    (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
-  shift g r = Some (v, r') -> fst r = fst r'.
-Proof.
-  intros vt nt g [v k] [v' k'] v'' H.
-  simpl.
-  unfold shift in H.
-  destruct (drop k (children g v)) eqn:E.
-  - discriminate H.
-  - injection H. intros _ H' _. apply H'.
-Qed.
-*)
 
 Lemma shift_sup : forall {vt nt}
     (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
@@ -641,16 +322,6 @@ Proof.
     rewrite E2. reflexivity.
   - discriminate H.
 Qed.
-
-(*
-Lemma shift_sup' : forall {vt nt}
-    (g : @Grammar vt nt) (r r' l : vt*nat),
-  shift g r = Some (fst l, r') ->
-  shift g l = None ->
-    sup' g r' = inf' g l ++ sup' g r.
-Proof.
-Admitted.
-*)
 
 Lemma fold_left_plus : forall (x : nat) (l : list nat),
   fold_left plus l x = fold_left plus l 0 + x.
@@ -746,7 +417,6 @@ Lemma sup'_destr : forall {vt nt}
 Proof.
   intros vt nt g r x l.
   intros H.
-  (* assert (H': inf' g r = []). *)
   apply (app_pref_eq' _ _ (inf' g r)) in H as H'.
   rewrite inf_plus_sup' in H'.
   destruct (inf' g r) eqn:E.
@@ -761,18 +431,6 @@ Proof.
     + simpl in H2. discriminate H2.
 Qed.
 
-(*
-Lemma app_suf_eq : forall {A : Type} (xs : list A) ys zs,
-  xs = ys -> xs ++ zs = ys ++ zs.
-
-Lemma app_pref_eq : forall {A : Type} (l l' pref : list A),
-  pref ++ l = pref ++ l' -> l = l'.
-
-  ; inf_plus_sup' :
-      forall (r : vert * nat),
-        inf' r ++ sup' r = [anchor (fst r)]
-*)
-
 Lemma shift_amort_weight : forall {vt nt}
     (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
   shift g r' = Some (v, r) ->
@@ -783,7 +441,7 @@ Proof.
   apply shift_preserves_head in H as H'.
   rewrite H'.
   apply shift_cost_sup in H as H''.
-  rewrite (minus_plus
+  rewrite (minus_le_plus
           (tree_weight g (fst r) + min_arc_weight g (anchor g (fst r)))
           (costs g (sup' g r'))).
   - rewrite H''. rewrite plus_minus. reflexivity.
@@ -810,7 +468,7 @@ Proof.
   apply shift_preserves_anchor in H as H2.
   rewrite <- H2.
   apply shift_cost_sup' in H as H3.
-  rewrite (minus_plus _ (costs g (sup g v))).
+  rewrite (minus_le_plus _ (costs g (sup g v))).
   - rewrite H3. rewrite plus_minus. reflexivity.
   - destruct (sup g v) eqn:E.
     + unfold costs. simpl. apply le_0_n.
@@ -908,8 +566,8 @@ Proof.
   - intros i j.
     simpl.
     intros H1 H2.
-    assert (H3: j = 0). { apply O_leb_O in H2. apply H2. }
-    assert (H4: i = 0). { rewrite H3 in H1. apply O_leb_O in H1. apply H1. }
+    assert (H3: j = 0). { inversion H2. reflexivity. }
+    assert (H4: i = 0). { rewrite H3 in H1. inversion H1. reflexivity. }
     rewrite H3. rewrite H4. rewrite in_span_ii_empty. simpl. reflexivity.
   - intros i j. intros H1 H2.
     inversion H2 as [H3|m H3 H4].
@@ -1032,10 +690,9 @@ Inductive item {vt nt}
       (r r' : vt*nat) (i : term) (j : term) (v : vt) (w _t : weight)
       (P: item g r i j w _t)
       (L: j <= term_max g)
-      (* (E: fmap (label g) (lead g r) = Some (terminal j)) : *)
       (E1: shift g r = Some (v, r'))
       (E2: label g v = Terminal j) :
-        item g r' i (S j) w (*(heuristic g r' i (S j))*)
+        item g r' i (S j) w
           (total g r i j w)
   | pseudo_subst
       (g : @Grammar vt nt) (l r l' : vt*nat) (i j k : term) (w1 w2 _t1 _t2 : weight)
@@ -1043,7 +700,7 @@ Inductive item {vt nt}
       (RP: item g r j k w2 _t2)
       (L: shift g r = None)
       (E: shift g l = Some (fst r, l')) :
-        item g l' i k (w1 + w2) (*(heuristic g l' i k)*)
+        item g l' i k (w1 + w2)
           (max (total g l i j w1) (total g r j k w2))
   | subst
       (g : @Grammar vt nt) (l r l' : vt*nat) (i j k : term) (v : vt)
@@ -1055,7 +712,7 @@ Inductive item {vt nt}
       (L3: shift g l = Some (v, l'))
       (L4: leaf g v = true)
       (E: label g v = label g (fst r)) :
-        item g l' i k (w1 + w2 + omega g (fst r) (fst l)) (*(heuristic g l' i k)*)
+        item g l' i k (w1 + w2 + omega g (fst r) (fst l))
           (max (total g l i j w1) (total g r j k w2)).
 
 Theorem item_i_leb_j : forall {vt nt} r i j w t (g : @Grammar vt nt)
@@ -1185,12 +842,7 @@ Proof.
       * rewrite L6. apply IHL.
       * apply L4.
       * rewrite L2' in E. apply E.
-(*
-      rewrite (shift_non_term_leaf_inf g l l' v x).
-      * apply IHL.
-      * apply L3.
-      * apply L4.
-      * rewrite L2' in E. apply E. *)
+
 Qed.
 
 Theorem in_vs_inside_root : forall {vt nt} r v i j w t
@@ -1215,16 +867,6 @@ Proof.
     + apply min_tree_weight_leb. reflexivity.
 Qed.
 
-(* TODO: not correct! use in_vs_inside
-Lemma inf_complete_eq_in_span : forall {vt nt} 
-  (g : @Grammar vt nt) r i j w t
-  (I: @item vt nt g r i j w t),
-    shift g r = None ->
-      inf g (fst r) = in_span i j.
-Proof.
-Admitted.
-*)
-
 Lemma amort_weight_complete : forall {vt nt}
   (g : @Grammar vt nt) (r : vt*nat),
     shift g r = None ->
@@ -1237,7 +879,6 @@ Proof.
   apply shift_sup_passive in H.
   rewrite H. reflexivity.
 Qed.
-
 
 Lemma root_non_term : forall {vt nt}
   (g : @Grammar vt nt) v,
@@ -1261,8 +902,6 @@ Lemma sup'_root : forall {vt nt}
       sup' g r = [].
 Proof.
 Admitted.
-
-Search (_ - 0).
 
 Theorem monotonic : forall {vt nt} r i j w t
   (g : @Grammar vt nt) (H: @item vt nt g r i j w t),
