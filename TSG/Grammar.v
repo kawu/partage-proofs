@@ -8,28 +8,33 @@ Import ListNotations.
 From LF Require Import Utils.
 From LF Require Import App.
 
+
 (** Terminal (position) in the input sentence *)
 Definition term := nat.
 
+
+(** Symbol assigned to a node in the grammar *)
 Inductive symbol {nt t} : Type :=
   | NonTerm (x : nt)
   | Terminal (x : t).
 
-(* Weight; eventually should be represented by a real number? *)
+
+(* Weight; TODO: real number? *)
 Definition weight := nat.
+
 
 (** Grammar representation.
 
-* [vert] -- type of vertex (node)
-* [non_term] -- non-terminal type
+The grammar is polymorphic on the vertex type ([vert]) and the non-terminal
+type ([non_term]).  Making the grammar [vert] polymorphic makes it safe to
+specify the grammar in terms of total functions ([root], [leaf], etc.).
 
-Making the grammar [vert] polymorphic makes it safe to specify
-the grammar in terms of total functions ([root], [leaf]).
+Whatever we prove for this grammar representation should also hold in the
+(sane) case where the vertex set is finite ([vert] can be in general
+instantiated with a finite type).
 
-Whatever we prove for this grammar representation should also hold
-in the case where the vertex set is finite, since [vert] can be
-in general instantiated with a simple, finite type.
-
+In this grammar representation we assume no grammar compression at all.
+That is, each node belongs to exactly one elementary tree (ET).
 *)
 Record Grammar {vert non_term : Type} := mkGram
   { vertices : list vert
@@ -79,47 +84,56 @@ Record Grammar {vert non_term : Type} := mkGram
       (* [inf] of the grammar root contains its single anchor terminal *)
 
   ; inf' : vert * nat -> list term
-      (* the list (=>set) of the processed terminals after
-         traversing (at most) the give number of children,
-         from left to right. *)
+      (* the list (=>set) of the processed terminals
+         for the given dotted rule *)
   ; sup' : vert * nat -> list term
       (* the list (=>set) of the terminals remaining to match after
-         traversing (at most) the give number of children,
-         from left to right. *)
+         for the given dotted rule *)
   ; inf_plus_sup' :
       forall (r : vert * nat),
         inf' r ++ sup' r = [anchor (fst r)]
+      (* analog of [inf_plus_sup] for dotted rules *)
 
   ; tree_weight : vert -> weight
       (* weight of the ET containing the given node *)
   ; arc_weight : term -> term -> weight
       (* weight of the given (dependency, head) arc *)
 
+  (** Some functions (e.g. [arc_weight], [min_tree_weight]) take terminals
+     as arguments.  TODO: make sure this is safe and explain why.
+  *)
+
   ; min_tree_weight : term -> weight
       (* minimal ET weight for the given terminal *)
   ; min_arc_weight : term -> weight
       (* minimal dependency weight for the given dependent *)
 
-  ; min_tree_weight_leb :
+  ; min_tree_weight_le :
       forall (v : vert) (t : term),
         anchor v = t ->
           min_tree_weight t <= tree_weight v
       (* minimal ET weight smaller than others *)
-  ; min_arc_weight_leb :
+  ; min_arc_weight_le :
       forall (dep hed : term),
         min_arc_weight dep <= arc_weight dep hed
-      (* minimal ET weight smaller than others *)
+      (* minimal dependency weight smaller than others *)
 
   ; shift : vert * nat -> option (vert * (vert * nat))
-      (* shift the dot *)
+      (* shift the dot in the dotted rule (if possible) *)
 
-  (* various shift-related properties (and more) *)
+  (** Below follow various shift-related and other additional properties.
+      The is not necessarily the smallest set!  Some properties could be
+      possibly proved in terms of the others.
+  *)
+
   ; shift_preserves_head : forall r r' v,
       shift r = Some (v, r') ->
         fst r = fst r'
+
   ; shift_inf : forall r r' v,
       shift r = Some (v, r') ->
         inf' r ++ inf v = inf' r'
+
   ; shift_inf_passive : forall r,
       shift r = None ->
         inf' r = inf (fst r)
@@ -128,14 +142,17 @@ Record Grammar {vert non_term : Type} := mkGram
       shift r = Some (v, r') ->
       label v = Terminal i ->
         inf' r' = inf' r ++ [i]
+
   ; shift_non_term_leaf_inf : forall r r' v x,
       shift r = Some (v, r') ->
       leaf v = true ->
       label v = NonTerm x ->
         inf v = [] /\ inf' r' = inf' r
+
   ; no_shift_inf : forall r,
       shift r = None ->
         inf' r = inf (fst r)
+
   ; term_inf : forall v i,
       label v = Terminal i ->
         inf v = [i]
@@ -143,6 +160,7 @@ Record Grammar {vert non_term : Type} := mkGram
   ; shift_preserves_tree_weight : forall l v l',
       shift l = Some (v, l') ->
         tree_weight v = tree_weight (fst l')
+
   ; shift_preserves_anchor : forall l v l',
       shift l = Some (v, l') ->
         anchor v = anchor (fst l')

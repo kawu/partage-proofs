@@ -159,9 +159,9 @@ Proof.
   rewrite H.
   unfold costs. simpl.
   unfold cost.
-  apply (combine_leb).
-  - apply min_arc_weight_leb.
-  - apply min_tree_weight_leb. reflexivity.
+  apply (combine_le).
+  - apply min_arc_weight_le.
+  - apply min_tree_weight_le. reflexivity.
 Qed.
 
 

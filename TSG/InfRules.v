@@ -135,7 +135,7 @@ Proof.
     rewrite (shift_term_inf g r1 r2 v j').
     + rewrite costs_app. rewrite costs_app.
       rewrite plus_assoc.
-      apply (plus_leb_r _ _ (costs g [j'])).
+      apply (plus_le_r _ _ (costs g [j'])).
       apply IHP.
     + apply E1.
     + apply E2.
@@ -150,7 +150,7 @@ Proof.
     rewrite (plus_comm w2).
     rewrite (plus_assoc).
     rewrite (plus_assoc_reverse (w1 + costs g (inf' g l))).
-    apply (combine_leb _ (w1 + costs g (inf' g l))).
+    apply (combine_le _ (w1 + costs g (inf' g l))).
     + apply IHL.
     + apply shift_inf_passive in L as L'.
       rewrite <- L'. apply IHP.
@@ -164,11 +164,11 @@ Proof.
     rewrite (plus_comm w1).
     rewrite (plus_assoc).
     rewrite (plus_assoc_reverse (w2 + omega g (fst r) (fst l))).
-    apply (combine_leb _ (w2 + omega g (fst r) (fst l))).
+    apply (combine_le _ (w2 + omega g (fst r) (fst l))).
     + transitivity (w2 + costs g (inf' g r)).
       * apply IHP.
       * rewrite (plus_comm w2). rewrite (plus_comm w2).
-        apply plus_leb_r.
+        apply plus_le_r.
         apply (inf_cost_vs_omega' g r (fst l)).
         { apply L1. } { apply L2. }
     + apply root_non_term in L2 as L2'.
@@ -189,7 +189,7 @@ Proof.
   intros vt nt r v i j w t g I R N.
   transitivity (w + costs g (inf' g r)).
   - apply (in_vs_inside _ _ _ _ t). apply I.
-  - apply combine_leb. { reflexivity. }
+  - apply combine_le. { reflexivity. }
     apply (inf_root_anchor) in R as A.
     apply shift_inf_passive in N as E.
     rewrite <- E in A.
@@ -197,9 +197,9 @@ Proof.
     unfold costs. simpl.
     unfold omega.
     unfold cost.
-    apply combine_leb.
-    + apply min_arc_weight_leb.
-    + apply min_tree_weight_leb. reflexivity.
+    apply combine_le.
+    + apply min_arc_weight_le.
+    + apply min_tree_weight_le. reflexivity.
 Qed.
 
 
@@ -223,18 +223,18 @@ Proof.
   - (* SC *)
     unfold total.
     rewrite (plus_comm w'). rewrite (plus_comm w').
-    apply plus_leb_r.
+    apply plus_le_r.
     unfold heuristic.
     apply shift_amort_weight in E1 as E1'.
     rewrite E1'.
     rewrite <- plus_assoc.
-    apply combine_leb. reflexivity.
+    apply combine_le. reflexivity.
     apply (item_i_le_j r1 i' j' w') in P as P'.
     apply (cost_rest_Sj g i') in L.
     rewrite L.
     apply term_inf in E2. rewrite E2.
     rewrite plus_comm.
-    apply combine_leb.
+    apply combine_le.
     reflexivity.
     reflexivity.
 
@@ -243,17 +243,17 @@ Proof.
 
     + unfold total.
       rewrite <- plus_assoc.
-      apply combine_leb. { reflexivity. }
+      apply combine_le. { reflexivity. }
       unfold heuristic.
       apply shift_amort_weight in E as E'.
       rewrite E'.
       rewrite <- plus_assoc. rewrite (plus_comm w2).
       rewrite <- plus_assoc.
-      apply combine_leb. { reflexivity. }
+      apply combine_le. { reflexivity. }
       rewrite (cost_rest_plus_in_r g i' j' k).
       * rewrite (plus_comm _ (costs g (rest g i' k))).
         rewrite <- plus_assoc.
-        apply combine_leb. { reflexivity. }
+        apply combine_le. { reflexivity. }
         rewrite <- shift_inf_passive.
         Focus 2. apply L.
         rewrite plus_comm.
@@ -265,21 +265,21 @@ Proof.
     + unfold total.
       rewrite (plus_comm w1).
       rewrite <- plus_assoc.
-      apply combine_leb. { reflexivity. }
+      apply combine_le. { reflexivity. }
       unfold heuristic.
       rewrite (cost_rest_plus_in_l g i' j' k).
         Focus 2. apply item_i_le_j in LP. apply LP.
 
       rewrite plus_assoc. rewrite plus_assoc.
-      apply combine_leb. Focus 2. reflexivity.
+      apply combine_le. Focus 2. reflexivity.
 
       rewrite (plus_comm w1).
-      apply (plus_leb_l _ _ (costs g (inf' g l))).
+      apply (plus_le_l _ _ (costs g (inf' g l))).
       rewrite <- (plus_assoc _ w1).
       rewrite (plus_comm (amort_weight' g r')).
       rewrite (plus_comm (amort_weight' g l')).
       rewrite <- (plus_assoc).
-      apply combine_leb.
+      apply combine_le.
       * apply (in_vs_inside l _ _ _ _t1). apply LP.
       * apply amort_weight_complete in L as L'.
         rewrite <- L'.
@@ -299,7 +299,7 @@ Proof.
 
     + unfold total.
       rewrite <- plus_assoc. rewrite <- plus_assoc.
-      apply combine_leb. { reflexivity. }
+      apply combine_le. { reflexivity. }
       unfold heuristic.
       apply shift_amort_weight in L3 as L5.
       rewrite L5.
@@ -312,10 +312,10 @@ Proof.
       rewrite (plus_comm w2).
       rewrite (plus_comm (omega _ _ _)).
       rewrite <- plus_assoc. rewrite <- plus_assoc.
-      apply combine_leb. { reflexivity. }
+      apply combine_le. { reflexivity. }
 
       rewrite (cost_rest_plus_in_r g i j k).
-      * apply combine_leb. { reflexivity. }
+      * apply combine_le. { reflexivity. }
         rewrite plus_comm.
         apply (in_vs_inside_root _ _ _ _ _ _t2).
         Focus 2. apply L2. Focus 2. apply L1.
@@ -327,7 +327,7 @@ Proof.
 
       rewrite (plus_comm w1).
       rewrite <- plus_assoc. rewrite <- plus_assoc.
-      apply combine_leb. { reflexivity. }
+      apply combine_le. { reflexivity. }
 
       unfold heuristic.
 
@@ -335,10 +335,10 @@ Proof.
         Focus 2. apply item_i_le_j in LP. apply LP.
 
       rewrite plus_assoc. rewrite plus_assoc. rewrite plus_assoc.
-      apply combine_leb. Focus 2. reflexivity.
+      apply combine_le. Focus 2. reflexivity.
 
       rewrite plus_comm.
-      apply (plus_leb_l _ _ (costs g (inf' g l))).
+      apply (plus_le_l _ _ (costs g (inf' g l))).
       rewrite <- plus_assoc.
 
       (* put everything in the right order *)
@@ -350,9 +350,9 @@ Proof.
       rewrite (plus_assoc w1).
       rewrite <- plus_assoc.
 
-      apply combine_leb.
+      apply combine_le.
       * apply (in_vs_inside l _ _ _ _t1). apply LP.
-      * apply combine_leb.
+      * apply combine_le.
         { unfold amort_weight'. unfold omega.
           rewrite (plus_comm (arc_weight _ _ _)).
           apply sup'_root in L2 as Rnil.
@@ -361,13 +361,13 @@ Proof.
           assert (C0: costs g [] = 0).
             { unfold costs. simpl. reflexivity. }
           rewrite C0. rewrite <- minus_n_O.
-          apply combine_leb. { reflexivity. }
-          apply min_arc_weight_leb. }
+          apply combine_le. { reflexivity. }
+          apply min_arc_weight_le. }
         { apply shift_amort_weight' in L3 as E'.
           rewrite <- E'. rewrite plus_comm.
           assert (H: forall x y, x <= x + y).
             { intros a b. rewrite (plus_n_O a).
-              apply combine_leb.
+              apply combine_le.
               - rewrite <- plus_n_O. reflexivity.
               - apply le_0_n. }
           apply H. }

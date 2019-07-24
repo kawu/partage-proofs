@@ -10,7 +10,7 @@ Proof.
   - apply le_S. apply IHle.
 Qed.
 
-Lemma plus_leb_r : forall (x y z : nat),
+Lemma plus_le_r : forall (x y z : nat),
   x <= y -> x + z <= y + z.
 Proof.
   intros x y z.
@@ -26,7 +26,7 @@ Proof.
     apply le_SS. apply H.
 Qed.
 
-Lemma plus_leb_l : forall (x y z : nat),
+Lemma plus_le_l : forall (x y z : nat),
   x + z <= y + z -> x <= y.
 Proof.
   intros x y z.
@@ -48,7 +48,7 @@ Proof.
       * apply H1.
 Qed.
 
-Lemma combine_leb : forall x1 y1 x2 y2 : nat,
+Lemma combine_le : forall x1 y1 x2 y2 : nat,
   x1 <= y1 ->
   x2 <= y2 ->
     x1 + x2 <= y1 + y2.
@@ -57,8 +57,8 @@ Proof.
   intros H1 H2.
   transitivity (x1 + y2).
   - rewrite plus_comm. rewrite (plus_comm x1).
-    apply plus_leb_r. apply H2.
-  - apply plus_leb_r. apply H1.
+    apply plus_le_r. apply H2.
+  - apply plus_le_r. apply H1.
 Qed.
 
 Lemma lebP : forall n m, reflect (n <= m) (n <=? m).

@@ -42,8 +42,8 @@ Proof.
     + apply sup'_destr in E as [E1 E2].
       rewrite E2. unfold costs.
       simpl. unfold cost. rewrite plus_comm.
-      apply (combine_leb).
-        * apply min_tree_weight_leb.
+      apply (combine_le).
+        * apply min_tree_weight_le.
           rewrite E1. rewrite H'. reflexivity.
         * rewrite E1. rewrite H'. reflexivity.
 Qed.
@@ -68,8 +68,8 @@ Proof.
     + apply sup_destr in E as [E1 E2].
       rewrite E2. unfold costs.
       simpl. unfold cost. rewrite plus_comm.
-      apply (combine_leb).
-        * apply min_tree_weight_leb.
+      apply (combine_le).
+        * apply min_tree_weight_le.
           rewrite E1. reflexivity.
         * rewrite E1. reflexivity.
 Qed.
