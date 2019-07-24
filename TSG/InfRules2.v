@@ -97,6 +97,12 @@ Inductive item {vt nt}
       (Lb: label g v = Terminal j) :
         item g (Rule r') i (S j) w
           (total' g r i j w)
+  | deact (g : @Grammar vt nt)
+      (r : vt*nat) (v : vt) (i j : term) (w _t : weight)
+      (P: item g (Rule r) i j w _t)
+      (Sh: shift g r = None) :
+        item g (Node (fst r)) i j w
+          (total' g r i j w)
   | pseudo_subst (g : @Grammar vt nt)
       (l l' : vt*nat) (v : vt) (i j k : term) (w1 w2 _t1 _t2 : weight)
       (LP: item g (Rule l) i j w1 _t1)
@@ -125,11 +131,13 @@ Proof.
   induction eta
     as [ g r i I L
        | g r1 r2 i j v w _t P IHP L Sh Lb
+       | g r v i j w _t P IHP Sh
        | g l l' v i j k w1 w2 _t1 _t2 LP IHL RP IHP Sh
        | g l l' v v' i j k w1 w2 _t1 _t2 LP IHL RP IHP Rv Le Lb Sh
        ].
   - reflexivity.
   - apply le_S. apply IHP.
+  - apply IHP.
   - transitivity j. { apply IHL. } { apply IHP. }
   - transitivity j. { apply IHL. } { apply IHP. }
 Qed.
@@ -144,11 +152,13 @@ Proof.
   induction eta
     as [ g r i I L
        | g r1 r2 i j v w _t P IHP L Sh Lb
+       | g r v i j w _t P IHP Sh
        | g l l' v i j k w1 w2 _t1 _t2 LP IHL RP IHP Sh
        | g l l' v v' i j k w1 w2 _t1 _t2 LP IHL RP IHP Rv Le Lb Sh
        ].
   - rewrite Nat.add_1_r. apply le_S. apply L.
   - rewrite Nat.add_1_r. apply le_n_S. apply L.
+  - apply IHP.
   - apply IHP.
   - apply IHP.
 Qed.
@@ -163,6 +173,7 @@ Proof.
   induction eta
     as [ g r i I L
        | g r1 r2 i j v w _t P IHP L Sh Lb
+       | g r v i j w _t P IHP Sh
        | g l l' v i j k w1 w2 _t1 _t2 LP IHL RP IHP Sh
        | g l l' v v' i j k w1 w2 _t1 _t2 LP IHL RP IHP Rv Le Lb Sh
        ].
@@ -177,6 +188,10 @@ Proof.
       apply IHP.
     + apply Sh.
     + apply Lb.
+  - simpl. simpl in IHP.
+    apply shift_inf_passive in Sh as H.
+    rewrite <- H.
+    apply IHP.
   - rewrite (in_span_split i j k).
     Focus 2. apply item_i_le_j in LP. apply LP.
     Focus 2. apply item_i_le_j in RP. apply RP.
@@ -240,31 +255,6 @@ Proof.
 Qed.
 
 
-(*
-Theorem in_vs_inside_root : forall {vt nt} r v i j w t
-  (g : @Grammar vt nt) (H: @item vt nt g r i j w t),
-    root g (fst r) = true ->
-    shift g r = None ->
-      costs g (in_span i j) <= w + omega g (fst r) v.
-Proof.
-  intros vt nt r v i j w t g I R N.
-  transitivity (w + costs g (inf' g r)).
-  - apply (in_vs_inside _ _ _ _ t). apply I.
-  - apply combine_le. { reflexivity. }
-    apply (inf_root_anchor) in R as A.
-    apply shift_inf_passive in N as E.
-    rewrite <- E in A.
-    rewrite A.
-    unfold costs. simpl.
-    unfold omega.
-    unfold cost.
-    apply combine_le.
-    + apply min_arc_weight_le.
-    + apply min_tree_weight_le. reflexivity.
-Qed.
-*)
-
-
 Theorem monotonic : forall {vt nt} s i j w t
   (g : @Grammar vt nt) (H: @item vt nt g s i j w t),
     t <= w + heuristic_s g s i j.
@@ -272,17 +262,10 @@ Proof.
   intros vt nt s i j w t g.
   intros eta.
 
-(*
-  destruct eta
-    as [ g r' i' I L
-       | g r1 r2 i' j' v w' _t' P L E1 E2
-       | g l r' l' i' j' k w1 w2 _t1 _t2 LP RP L E
-       | g l r l' i j k v w1 w2 _t1 _t2 LP RP L1 L2 L3 L4 E
-       ]. *)
-
   destruct eta
     as [ g r i I L
        | g r1 r2 i j v w _t P L Sh Lb
+       | g r v i j w _t P Sh
        | g l l' v i j k w1 w2 _t1 _t2 LP RP Sh
        | g l l' v v' i j k w1 w2 _t1 _t2 LP RP Rv Le Lb Sh
        ].
@@ -306,6 +289,14 @@ Proof.
     reflexivity.
     reflexivity.
 
+  - (* DE *)
+    simpl. unfold total'.
+    unfold heuristic. unfold heuristic'.
+    unfold amort_weight. unfold amort_weight'.
+    apply shift_sup_passive in Sh as H.
+    rewrite <- H.
+    reflexivity.
+
   - (* PS *)
     apply Nat.max_lub_iff. split.
 
@@ -321,8 +312,6 @@ Proof.
       * rewrite (plus_comm _ (costs g (rest g i k))).
         rewrite <- plus_assoc.
         apply combine_le. { reflexivity. }
-        (* rewrite <- shift_inf_passive. *)
-        (* Focus 2. apply L. *)
         rewrite plus_comm.
         assert (H: inf_s g (Node v) = inf g v).
           { simpl. reflexivity. }
