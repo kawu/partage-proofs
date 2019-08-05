@@ -1,4 +1,5 @@
-From Coq Require Import Arith.Arith.
+(* From Coq Require Import Arith.Arith. *)
+From Coq Require Import Reals.Reals.
 From Coq Require Import Bool.Bool.
 Require Export Coq.Strings.String.
 From Coq Require Import Logic.FunctionalExtensionality.
@@ -20,7 +21,12 @@ Inductive symbol {nt t} : Type :=
 
 
 (* Weight; TODO: real number? *)
-Definition weight := nat.
+Definition weight := R.
+
+
+(** We switch the scope to correctly interpret certain notation, e.g. "<=" *)
+Open Scope R_scope.
+(* About "<=". *)
 
 
 (** Grammar representation.
@@ -45,7 +51,7 @@ Record Grammar {vert non_term : Type} := mkGram
   ; term_max : term
       (* the last position in the sentence *)
   ; term_max_correct : maximum terminals = Some term_max
-  ; term_min_correct : minimum terminals = Some 0
+  ; term_min_correct : minimum terminals = Some O (* O = Peanu.0 *)
 
   ; root : vert -> bool
       (* is the given node a root of an ET? *)
@@ -187,7 +193,7 @@ Definition rules {vt nt} (g : @Grammar vt nt) : list (vt*nat) :=
     f v :=
       if leaf g v
       then None
-      else Some (v, 0)
+      else Some (v, O)
   in
     map_maybe f (vertices g).
 
@@ -415,3 +421,6 @@ Proof.
   rewrite H1 in H2.
   apply H2.
 Qed.
+
+
+Close Scope R_scope.

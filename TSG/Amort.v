@@ -1,4 +1,5 @@
 From Coq Require Import Arith.Arith.
+From Coq Require Import Reals.Reals.
 From Coq Require Import Bool.Bool.
 Require Export Coq.Strings.String.
 From Coq Require Import Logic.FunctionalExtensionality.
@@ -11,6 +12,9 @@ From LF Require Import App.
 From LF Require Import Grammar.
 From LF Require Import Span.
 From LF Require Import Cost.
+
+Open Scope R_scope.
+
 
 (** Amortized weight of the given passive parsing configuration *)
 Definition amort_weight {vt nt} (g : @Grammar vt nt) (n : vt) : weight :=
@@ -87,3 +91,6 @@ Proof.
   apply shift_sup_passive in H.
   rewrite H. reflexivity.
 Qed.
+
+
+Close Scope R_scope.

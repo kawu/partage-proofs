@@ -1,4 +1,5 @@
-From Coq Require Import Arith.Arith.
+(* From Coq Require Import Arith.Arith. *)
+From Coq Require Import Reals.Reals.
 From Coq Require Import Lists.List.
 Import ListNotations.
 
@@ -27,6 +28,7 @@ Fixpoint drop {A : Type} (k : nat) (l : list A) : list A :=
   | _, [] => []
   end.
 
+(* Open Scope R_scope. *)
 
 (** Minimum nat *)
 Fixpoint minimum (xs : list nat) : option nat :=
@@ -35,7 +37,7 @@ Fixpoint minimum (xs : list nat) : option nat :=
   | x :: t =>
     match minimum t with
     | None => Some x
-    | Some y => Some (min x y)
+    | Some y => Some (min x y) (* Rmin for Reals *)
     end
   end.
 
@@ -50,6 +52,8 @@ Fixpoint maximum (xs : list nat) : option nat :=
     | Some y => Some (max x y)
     end
   end.
+
+(* Close Scope R_scope. *)
 
 
 (* fmap for an option *)
@@ -66,10 +70,14 @@ Definition fmap
 **)
 
 
+Open Scope R_scope.
+
+
 Lemma minus_le_plus : forall x y z,
   y <= x ->
     (x - y) + z = (x + z) - y.
-Proof.
+Proof. Admitted.
+(*
   intros x y z. intros H.
   induction z as [|z' IH].
   - rewrite plus_0_r. rewrite plus_0_r. reflexivity.
@@ -81,27 +89,34 @@ Proof.
     + transitivity x.
       * apply H.
       * apply le_plus_l.
-Qed.
+Qed. *)
 
 
 Lemma plus_minus : forall x y z,
   (x + y) - (y + z) = x - z.
-Proof.
+Proof. Admitted.
+(*
   intros x y z.
   induction y as [|y' IH].
   - simpl. rewrite plus_0_r. reflexivity.
   - simpl. rewrite <- plus_Snm_nSm. simpl. apply IH.
-Qed.
+Qed. *)
 
 
-Lemma fold_left_plus : forall (x : nat) (l : list nat),
-  fold_left plus l x = fold_left plus l 0 + x.
+About Rplus_comm.
+
+
+Lemma fold_left_plus : forall (x : R) (l : list R),
+  fold_left Rplus l x = fold_left Rplus l 0 + x.
 Proof.
   intros x l.
   generalize dependent x.
   induction l as [|h t IH].
-  - intros x. simpl. reflexivity.
-  - intros x. simpl. rewrite IH.
-    rewrite (IH h). rewrite <- plus_assoc.
-    rewrite (plus_comm x h). reflexivity.
+  - intros x. simpl. rewrite Rplus_0_l. reflexivity.
+  - intros x. simpl. rewrite IH. rewrite Rplus_0_l.
+    rewrite (IH h). rewrite -> Rplus_assoc.
+    rewrite (Rplus_comm x h). reflexivity.
 Qed.
+
+
+Close Scope R_scope.

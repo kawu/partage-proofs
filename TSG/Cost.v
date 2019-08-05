@@ -1,4 +1,5 @@
 From Coq Require Import Arith.Arith.
+From Coq Require Import Reals.Reals.
 From Coq Require Import Bool.Bool.
 Require Export Coq.Strings.String.
 From Coq Require Import Logic.FunctionalExtensionality.
@@ -12,6 +13,9 @@ From LF Require Import Grammar.
 From LF Require Import Span.
 
 
+Open Scope R_scope.
+
+
 (** The minimal cost of scanning the given terminal *)
 Definition cost {vt nt} (g : @Grammar vt nt) (t : term) : weight :=
   min_arc_weight g t + min_tree_weight g t.
@@ -20,7 +24,19 @@ Definition cost {vt nt} (g : @Grammar vt nt) (t : term) : weight :=
 (** The minimal cost of scanning the given list of terminals *)
 Definition costs {vt nt}
     (g : @Grammar vt nt) (ts : list term) : weight :=
-  fold_left plus (map (cost g) ts) 0.
+  fold_left Rplus (map (cost g) ts) 0.
+
+
+Lemma costs_nil :  forall {vt nt}
+  (g : @Grammar vt nt),
+    costs g [] = 0.
+Proof.
+  intros vt nt g.
+  unfold costs. simpl. reflexivity.
+Qed.
+
+
+Search (0 + _).
 
 
 Lemma costs_app : forall {vt nt}
@@ -30,14 +46,16 @@ Proof.
   intros vt nt g ts ts'.
   generalize dependent ts'.
   induction ts as [|tsh tst IH].
-  - intros ts'. simpl. reflexivity.
+  - intros ts'. simpl. rewrite costs_nil.
+    rewrite Rplus_0_l. reflexivity.
   - intros ts'. rewrite <- app_comm_cons.
     unfold costs. simpl.
     unfold costs in IH.
-    rewrite fold_left_plus. rewrite (fold_left_plus (cost g tsh)).
-    rewrite IH. rewrite <- plus_assoc.
-    rewrite (plus_comm _ (cost _ _)).
-    rewrite plus_assoc. reflexivity.
+    rewrite fold_left_plus. rewrite Rplus_0_l.
+    rewrite (fold_left_plus (cost g tsh)).
+    rewrite IH. rewrite Rplus_assoc.
+    rewrite (Rplus_comm _ (cost _ _)).
+    rewrite <- Rplus_assoc. reflexivity.
 Qed.
 
 
@@ -71,41 +89,38 @@ Proof.
 Qed.
 
 
-Lemma costs_nil :  forall {vt nt}
-  (g : @Grammar vt nt),
-    costs g [] = 0.
-Proof.
-  intros vt nt g.
-  unfold costs. simpl. reflexivity.
-Qed.
-
-
 Lemma cost_one : forall {vt nt} (g : @Grammar vt nt) (i : term),
   costs g [i] = cost g i.
 Proof.
   intros vt nt g i.
   unfold costs.
-  simpl. reflexivity.
+  simpl.
+  rewrite Rplus_0_l.
+  reflexivity.
 Qed.
+
+
+About f_equal2_plus.
 
 
 (* TODO: prove based on cost_rest_plus_in_r *)
 Lemma cost_rest_Sj : forall {vt nt} (g : @Grammar vt nt) (i j : term),
-  j <= term_max g ->
+  (* j <= term_max g -> *)
+  Nat.le j (term_max g) ->
     costs g (rest g i j) = costs g (rest g i (S j)) + cost g j.
 Proof.
   intros vt nt g i j H2.
   unfold rest.
   rewrite costs_app.
   rewrite costs_app.
-  rewrite <- plus_assoc.
-  apply (f_equal2_plus). { reflexivity. }
-  simpl.
+  (* rewrite <- plus_assoc. *)
+  rewrite Rplus_assoc.
+  apply f_equal2. { reflexivity. }
+  (* apply (f_equal2_plus). { reflexivity. } *)
+  (* simpl. *)
   rewrite <- in_span_Si.
-  - simpl. rewrite <- cost_one.
-    rewrite (plus_comm _ (costs g [j])).
-    rewrite <- costs_app.
-    simpl. reflexivity.
+  - rewrite costs_app. rewrite <- cost_one.
+    rewrite Rplus_comm. reflexivity.
   - rewrite plus_comm. simpl.
     apply le_n_S. apply H2.
 Qed.
@@ -113,39 +128,44 @@ Qed.
 
 Lemma cost_rest_plus_in_r : forall {vt nt}
   (g : @Grammar vt nt) (i j k : term),
-    j <= k ->
-    k <= term_max g + 1 ->
+    Nat.le j k ->
+    Nat.le k (term_max g + 1) ->
       costs g (rest g i j) = costs g (rest g i k) + costs g (in_span j k).
 Proof.
   intros vt nt g i j k H1 H2.
   unfold rest.
   rewrite costs_app. rewrite costs_app.
-  rewrite <- plus_assoc.
-  apply f_equal2_plus. { reflexivity. }
+  rewrite Rplus_assoc.
+  apply f_equal2. { reflexivity. }
   rewrite (in_span_split j k).
-  - rewrite costs_app. rewrite plus_comm. reflexivity.
+  - rewrite costs_app. rewrite Rplus_comm. reflexivity.
   - apply H1.
   - apply H2.
 Qed.
 
+
 Lemma cost_rest_plus_in_l : forall {vt nt}
   (g : @Grammar vt nt) (i j k : term),
-    i <= j ->
+    Nat.le i j ->
       costs g (rest g j k) = costs g (in_span i j) + costs g (rest g i k).
 Proof.
   intros vt nt g i j k H1.
   unfold rest.
   rewrite costs_app.
   rewrite costs_app.
-  rewrite plus_assoc.
-  apply (f_equal2_plus).
+  rewrite <- Rplus_assoc.
+  apply (f_equal2).
   Focus 2. reflexivity.
-  rewrite plus_comm.
+  rewrite Rplus_comm.
   rewrite (in_span_split 0 i j).
   - rewrite costs_app. reflexivity.
   - apply le_0_n.
   - apply H1.
 Qed.
+
+
+About combine_le.
+Search (_ <= _ -> (_ + _ <= _ + _)).
 
 
 Lemma inf_cost_vs_omega : forall {vt nt} (g : @Grammar vt nt) (v w : vt),
@@ -157,9 +177,9 @@ Proof.
   unfold omega.
   apply inf_root_anchor in RH as H.
   rewrite H.
-  unfold costs. simpl.
+  unfold costs. simpl. rewrite Rplus_0_l.
   unfold cost.
-  apply (combine_le).
+  apply (Rplus_le_compat).
   - apply min_arc_weight_le.
   - apply min_tree_weight_le. reflexivity.
 Qed.
@@ -179,3 +199,5 @@ Proof.
   apply R.
 Qed.
 
+
+Close Scope R_scope.
