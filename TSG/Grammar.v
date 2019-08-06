@@ -6,6 +6,8 @@ From Coq Require Import Logic.FunctionalExtensionality.
 From Coq Require Import Lists.List.
 Import ListNotations.
 
+Require Coq.Classes.RelationClasses.
+
 From LF Require Import Utils.
 From LF Require Import App.
 
@@ -51,7 +53,7 @@ Record Grammar {vert non_term : Type} := mkGram
   ; term_max : term
       (* the last position in the sentence *)
   ; term_max_correct : maximum terminals = Some term_max
-  ; term_min_correct : minimum terminals = Some O (* O = Peanu.0 *)
+  ; term_min_correct : minimum terminals = Some O (* O = Peano.0 *)
 
   ; root : vert -> bool
       (* is the given node a root of an ET? *)
@@ -123,6 +125,14 @@ Record Grammar {vert non_term : Type} := mkGram
       forall (dep hed : term),
         min_arc_weight dep <= arc_weight dep hed
       (* minimal dependency weight smaller than others *)
+  ; min_tree_weight_ge_0 :
+      forall (t : term),
+        0 <= min_tree_weight t
+      (* minimal ET weight at least 0 *)
+  ; min_arc_weight_ge_0 :
+      forall (dep : term),
+        0 <= min_arc_weight dep
+      (* minimal dependency weight at least 0 *)
 
   ; shift : vert * nat -> option (vert * (vert * nat))
       (* shift the dot in the dotted rule (if possible) *)
@@ -201,6 +211,18 @@ Definition rules {vt nt} (g : @Grammar vt nt) : list (vt*nat) :=
 (**
   Various additional properties stemming from the grammar representation
 **)
+
+
+(** ET weight at least 0 *)
+Lemma tree_weight_ge_0 : forall {vt nt}
+  (g : @Grammar vt nt) (v : vt),
+    0 <= tree_weight g v.
+Proof.
+  intros vt nt g v.
+  apply (Rle_trans _ (min_tree_weight g (anchor g v))).
+  - apply min_tree_weight_ge_0.
+  - apply min_tree_weight_le. reflexivity.
+Qed.
 
 
 (** [inf'] can contain at most one terminal *)

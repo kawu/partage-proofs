@@ -42,14 +42,19 @@ Proof.
           (costs g (sup' g r'))).
   - rewrite H''. rewrite plus_minus. reflexivity.
   - destruct (sup' g r') eqn:E.
-    + unfold costs. simpl. apply Peano.le_0_n.
+    + unfold costs. simpl.
+      rewrite <- (Rplus_0_l 0).
+      apply Rplus_le_compat.
+      * apply tree_weight_ge_0.
+      * apply min_arc_weight_ge_0.
     + apply sup'_destr in E as [E1 E2].
       rewrite E2. unfold costs.
-      simpl. unfold cost. rewrite plus_comm.
-      apply (combine_le).
+      simpl. unfold cost. rewrite Rplus_0_l.
+      rewrite <- Rplus_comm.
+      apply Rplus_le_compat.
         * apply min_tree_weight_le.
           rewrite E1. rewrite H'. reflexivity.
-        * rewrite E1. rewrite H'. reflexivity.
+        * rewrite E1. rewrite H'. apply Rle_refl.
 Qed.
 
 
@@ -68,14 +73,18 @@ Proof.
   rewrite (minus_le_plus _ (costs g (sup g v))).
   - rewrite H3. rewrite plus_minus. reflexivity.
   - destruct (sup g v) eqn:E.
-    + unfold costs. simpl. apply le_0_n.
+    + unfold costs. simpl. rewrite <- (Rplus_0_l 0).
+      apply Rplus_le_compat.
+      * apply tree_weight_ge_0.
+      * apply min_arc_weight_ge_0.
     + apply sup_destr in E as [E1 E2].
       rewrite E2. unfold costs.
-      simpl. unfold cost. rewrite plus_comm.
-      apply (combine_le).
+      simpl. unfold cost. rewrite Rplus_0_l.
+      rewrite <- Rplus_comm.
+      apply Rplus_le_compat.
         * apply min_tree_weight_le.
           rewrite E1. reflexivity.
-        * rewrite E1. reflexivity.
+        * rewrite E1. apply Rle_refl.
 Qed.
 
 
