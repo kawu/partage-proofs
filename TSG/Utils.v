@@ -73,6 +73,23 @@ Definition fmap
 Open Scope R_scope.
 
 
+Axiom Rmax_Rle' : forall n m p : R,
+  Rmax n m <= p <-> n <= p /\ m <= p.
+
+
+Lemma fold_left_plus : forall (x : R) (l : list R),
+  fold_left Rplus l x = fold_left Rplus l 0 + x.
+Proof.
+  intros x l.
+  generalize dependent x.
+  induction l as [|h t IH].
+  - intros x. simpl. rewrite Rplus_0_l. reflexivity.
+  - intros x. simpl. rewrite IH. rewrite Rplus_0_l.
+    rewrite (IH h). rewrite -> Rplus_assoc.
+    rewrite (Rplus_comm x h). reflexivity.
+Qed.
+
+
 Lemma minus_le_plus : forall x y z,
   y <= x ->
     (x - y) + z = (x + z) - y.
@@ -102,21 +119,32 @@ Proof. Admitted.
   - simpl. rewrite <- plus_Snm_nSm. simpl. apply IH.
 Qed. *)
 
+Lemma Rplus_reord1 : forall (a b c d : R),
+  a + b + c + d = (a + d) + (b + c).
+Proof. Admitted.
 
-About Rplus_comm.
 
-
-Lemma fold_left_plus : forall (x : R) (l : list R),
-  fold_left Rplus l x = fold_left Rplus l 0 + x.
+Lemma Rplus_reord2 : forall (a b c d : R),
+  (a + b) + (c + d) = (a + c) + (b + d).
 Proof.
-  intros x l.
-  generalize dependent x.
-  induction l as [|h t IH].
-  - intros x. simpl. rewrite Rplus_0_l. reflexivity.
-  - intros x. simpl. rewrite IH. rewrite Rplus_0_l.
-    rewrite (IH h). rewrite -> Rplus_assoc.
-    rewrite (Rplus_comm x h). reflexivity.
+  intros a b c d.
+  rewrite <- (Rplus_assoc (a + b)).
+  rewrite (Rplus_assoc a).
+  rewrite (Rplus_comm b).
+  rewrite <- (Rplus_assoc).
+  rewrite (Rplus_assoc (a + _)).
+  reflexivity.
 Qed.
+
+
+Lemma Rplus_reord3 : forall (a b c d : R),
+  a + (b + (c + d)) = c + (d + (a + b)).
+Proof. Admitted.
+
+
+Lemma Rplus_reord4 : forall (a b c : R),
+  a + b + c = b + (a + c).
+Proof. Admitted.
 
 
 Close Scope R_scope.

@@ -36,7 +36,24 @@ Proof.
 Qed.
 
 
-Search (0 + _).
+Lemma costs_ge_0 :  forall {vt nt}
+  (g : @Grammar vt nt) (ts : list term),
+    0 <= costs g ts.
+Proof.
+  intros vt nt g ts.
+  unfold costs.
+  induction ts as [|x ts' IH].
+  - simpl. apply Rle_refl.
+  - simpl. rewrite Rplus_0_l.
+    rewrite fold_left_plus.
+    rewrite <- (Rplus_0_l 0).
+    apply Rplus_le_compat.
+    + rewrite Rplus_0_l. apply IH.
+    + unfold cost. rewrite <- (Rplus_0_l 0).
+      apply Rplus_le_compat.
+      * apply min_arc_weight_ge_0.
+      * apply min_tree_weight_ge_0.
+Qed.
 
 
 Lemma costs_app : forall {vt nt}
@@ -100,9 +117,6 @@ Proof.
 Qed.
 
 
-About f_equal2_plus.
-
-
 (* TODO: prove based on cost_rest_plus_in_r *)
 Lemma cost_rest_Sj : forall {vt nt} (g : @Grammar vt nt) (i j : term),
   (* j <= term_max g -> *)
@@ -162,10 +176,6 @@ Proof.
   - apply le_0_n.
   - apply H1.
 Qed.
-
-
-About combine_le.
-Search (_ <= _ -> (_ + _ <= _ + _)).
 
 
 Lemma inf_cost_vs_omega : forall {vt nt} (g : @Grammar vt nt) (v w : vt),

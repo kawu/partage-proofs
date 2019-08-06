@@ -16,15 +16,103 @@ From LF Require Import Cost.
 Open Scope R_scope.
 
 
+(** TODO: move to Cost *)
+Lemma costs_sup_le : forall {vt nt}
+  (g : @Grammar vt nt) (v : vt) t,
+    anchor g v = t ->
+      costs g (sup g v) <= min_arc_weight g t + tree_weight g v.
+Proof.
+  intros vt nt g v t.
+  intros A.
+  destruct sup eqn:E.
+  - unfold costs. simpl.
+    rewrite <- (Rplus_0_l 0).
+    apply Rplus_le_compat.
+    + apply min_arc_weight_ge_0.
+    + apply tree_weight_ge_0.
+  - apply sup_destr in E as [H Lempty].
+    rewrite Lempty. rewrite cost_one.
+    unfold cost.
+    rewrite A in H. rewrite H.
+    apply Rplus_le_compat.
+    + apply Rle_refl.
+    + apply min_tree_weight_le.
+      apply A.
+Qed.
+
+
+Lemma costs_sup'_le : forall {vt nt}
+  (g : @Grammar vt nt) r v t,
+    fst r = v ->
+    anchor g v = t ->
+      costs g (sup' g r) <= min_arc_weight g t + tree_weight g v.
+Proof.
+  intros vt nt g r v t.
+  intros F A.
+  destruct sup' eqn:E.
+  - unfold costs. simpl.
+    rewrite <- (Rplus_0_l 0).
+    apply Rplus_le_compat.
+    + apply min_arc_weight_ge_0.
+    + apply tree_weight_ge_0.
+  - apply sup'_destr in E as [H Lempty].
+    rewrite Lempty. rewrite cost_one.
+    unfold cost.
+    rewrite F in H.
+    rewrite A in H. rewrite H.
+    apply Rplus_le_compat.
+    + apply Rle_refl.
+    + apply min_tree_weight_le.
+      apply A.
+Qed.
+
+
 (** Amortized weight of the given passive parsing configuration *)
 Definition amort_weight {vt nt} (g : @Grammar vt nt) (n : vt) : weight :=
   tree_weight g n + min_arc_weight g (anchor g n) - costs g (sup g n).
+
+
+Lemma amort_weight_ge_0 : forall {vt nt}
+    (g : @Grammar vt nt) (v : vt),
+  0 <= amort_weight g v.
+Proof.
+  intros vt nt g v.
+  unfold amort_weight.
+  apply (Rplus_le_reg_r (costs g (sup g v))).
+  rewrite Rplus_0_l.
+  unfold Rminus.
+  rewrite (Rplus_assoc).
+  rewrite Rplus_opp_l.
+  rewrite Rplus_0_r.
+  rewrite Rplus_comm.
+  apply costs_sup_le.
+  reflexivity.
+Qed.
 
 
 (** Amortized weight of the given active parsing configuration *)
 Definition amort_weight' {vt nt} (g : @Grammar vt nt) (r : vt*nat) : weight :=
   let n := fst r
   in tree_weight g n + min_arc_weight g (anchor g n) - costs g (sup' g r).
+
+
+Lemma amort_weight'_ge_0 : forall {vt nt}
+    (g : @Grammar vt nt) (r : vt*nat),
+  0 <= amort_weight' g r.
+Proof.
+  intros vt nt g r.
+  unfold amort_weight'.
+  apply (Rplus_le_reg_r (costs g (sup' g r))).
+  rewrite Rplus_0_l.
+  unfold Rminus.
+  rewrite (Rplus_assoc).
+  rewrite Rplus_opp_l.
+  rewrite Rplus_0_r.
+  rewrite Rplus_comm.
+  apply costs_sup'_le.
+  - reflexivity.
+  - reflexivity.
+Qed.
 
 
 Lemma shift_amort_weight : forall {vt nt}
