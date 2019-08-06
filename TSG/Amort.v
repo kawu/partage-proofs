@@ -128,6 +128,8 @@ Proof.
   rewrite (minus_le_plus
           (tree_weight g (fst r) + min_arc_weight g (anchor g (fst r)))
           (costs g (sup' g r'))).
+  rewrite H''. rewrite plus_minus. reflexivity.
+(*
   - rewrite H''. rewrite plus_minus. reflexivity.
   - destruct (sup' g r') eqn:E.
     + unfold costs. simpl.
@@ -143,6 +145,7 @@ Proof.
         * apply min_tree_weight_le.
           rewrite E1. rewrite H'. reflexivity.
         * rewrite E1. rewrite H'. apply Rle_refl.
+*)
 Qed.
 
 
@@ -159,6 +162,8 @@ Proof.
   rewrite <- H2.
   apply shift_cost_sup' in H as H3.
   rewrite (minus_le_plus _ (costs g (sup g v))).
+  rewrite H3. rewrite plus_minus. reflexivity.
+(*
   - rewrite H3. rewrite plus_minus. reflexivity.
   - destruct (sup g v) eqn:E.
     + unfold costs. simpl. rewrite <- (Rplus_0_l 0).
@@ -173,6 +178,7 @@ Proof.
         * apply min_tree_weight_le.
           rewrite E1. reflexivity.
         * rewrite E1. apply Rle_refl.
+*)
 Qed.
 
 

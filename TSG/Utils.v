@@ -73,6 +73,21 @@ Definition fmap
 Open Scope R_scope.
 
 
+(*
+Lemma Rmax_right_inv : forall x y : R,
+  Rmax x y = y -> x <= y.
+Proof.
+  intros x y H.
+  destruct (Rle_dec y x) eqn:E.
+  - apply Rmax_left in r as H'.
+    rewrite H' in H.
+    unfold Rle. right. apply H.
+  - apply Rnot_le_lt in n as H'.
+    unfold Rle. left. apply H'.
+Qed.
+*)
+
+
 Axiom Rmax_Rle' : forall n m p : R,
   Rmax n m <= p <-> n <= p /\ m <= p.
 
@@ -91,37 +106,50 @@ Qed.
 
 
 Lemma minus_le_plus : forall x y z,
-  y <= x ->
-    (x - y) + z = (x + z) - y.
-Proof. Admitted.
-(*
-  intros x y z. intros H.
-  induction z as [|z' IH].
-  - rewrite plus_0_r. rewrite plus_0_r. reflexivity.
-  - rewrite Nat.add_succ_r.
-    rewrite Nat.add_succ_r.
-    rewrite IH.
-    rewrite minus_Sn_m.
-    + reflexivity.
-    + transitivity x.
-      * apply H.
-      * apply le_plus_l.
-Qed. *)
+  (x - y) + z = (x + z) - y.
+Proof.
+  intros x y z.
+  unfold Rminus.
+  rewrite Rplus_assoc. rewrite Rplus_assoc.
+  apply Rplus_eq_compat_l.
+  rewrite Rplus_comm.
+  reflexivity.
+Qed.
 
+
+Search (_ = _ -> _ + _ = _ + _).
+Search (_ + _ = _ + _ -> _ = _).
+Search (- (_ + _)).
 
 Lemma plus_minus : forall x y z,
   (x + y) - (y + z) = x - z.
-Proof. Admitted.
-(*
+Proof.
   intros x y z.
-  induction y as [|y' IH].
-  - simpl. rewrite plus_0_r. reflexivity.
-  - simpl. rewrite <- plus_Snm_nSm. simpl. apply IH.
-Qed. *)
+  unfold Rminus.
+  rewrite Rplus_assoc.
+  apply Rplus_eq_compat_l.
+  apply (Rplus_eq_reg_l (- y)).
+  rewrite <- Rplus_assoc.
+  rewrite Rplus_opp_l.
+  rewrite Rplus_0_l.
+  rewrite Ropp_plus_distr.
+  reflexivity.
+Qed.
+
 
 Lemma Rplus_reord1 : forall (a b c d : R),
   a + b + c + d = (a + d) + (b + c).
-Proof. Admitted.
+Proof.
+  intros a b c d.
+  rewrite Rplus_assoc.
+  rewrite Rplus_assoc.
+  rewrite (Rplus_comm c d).
+  rewrite <- (Rplus_assoc b).
+  rewrite (Rplus_comm b d).
+  rewrite Rplus_assoc.
+  rewrite <- Rplus_assoc.
+  reflexivity.
+Qed.
 
 
 Lemma Rplus_reord2 : forall (a b c d : R),
@@ -139,12 +167,23 @@ Qed.
 
 Lemma Rplus_reord3 : forall (a b c d : R),
   a + (b + (c + d)) = c + (d + (a + b)).
-Proof. Admitted.
+Proof.
+  intros a b c d.
+  rewrite <- Rplus_assoc.
+  rewrite Rplus_comm.
+  rewrite Rplus_assoc.
+  reflexivity.
+Qed.
 
 
 Lemma Rplus_reord4 : forall (a b c : R),
   a + b + c = b + (a + c).
-Proof. Admitted.
+Proof.
+  intros a b c.
+  rewrite (Rplus_comm a).
+  rewrite Rplus_assoc.
+  reflexivity.
+Qed.
 
 
 Close Scope R_scope.
