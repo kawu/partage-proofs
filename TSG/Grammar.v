@@ -236,6 +236,18 @@ Proof.
 Qed.
 
 
+(** arc weight at least 0 *)
+Lemma arc_weight_ge_0 : forall {vt nt}
+  (g : @Grammar vt nt) x y,
+    0 <= arc_weight g x y.
+Proof.
+  intros vt nt g x y.
+  apply (Rle_trans _ (min_arc_weight g x)).
+  - apply min_arc_weight_ge_0.
+  - apply min_arc_weight_le.
+Qed.
+
+
 (** [inf'] can contain at most one terminal *)
 Lemma inf'_tail_empty : forall {vt nt}
   (g : @Grammar vt nt) (r : vt * nat) x l,
@@ -474,6 +486,19 @@ Proof.
   apply shift_sup_passive in H2.
   rewrite H1 in H2.
   apply H2.
+Qed.
+
+
+Lemma omega_ge_0 : forall {vt nt}
+  (g : @Grammar vt nt) v u,
+    0 <= omega g v u.
+Proof.
+  intros vt nt g v u.
+  unfold omega.
+  rewrite <- (Rplus_0_l 0).
+  apply Rplus_le_compat.
+  - apply arc_weight_ge_0.
+  - apply tree_weight_ge_0.
 Qed.
 
 

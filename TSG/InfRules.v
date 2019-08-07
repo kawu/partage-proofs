@@ -173,9 +173,19 @@ Inductive item {vt nt}
       (Sh: shift g l = Some (v', l'))
       (Fv: foot g v' = true)
       (Lb: label g v = label g v') :
-        (* NOTE: [w1' = 0]! where to account for it? *)
-        item g (Rule l') i k p2 q2 w1 (w1' + w2 + w2' + amort_weight g v)
-          (Rmax (total' g l i j w1 w1') (total g v j k w2 w2')).
+        (* NOTE: [w1' = 0]! *)
+        item g (Rule l') i k (Some j) (Some k) w1 (w1' + w2 + w2' + amort_weight g v)
+          (Rmax (total' g l i j w1 w1') (total g v j k w2 w2'))
+  | root_adjoin (g : @Grammar vt nt)
+      (v u : vt) (i j k l : term) p2 q2
+      (w1 w2 w1' w2' _t1 _t2 : weight)
+      (LP: item g (Node v) i l (Some j) (Some k) w1 w1' _t1)
+      (RP: item g (Node u) j k p2 q2 w2 w2' _t2)
+      (Rv: root g v = true)
+      (Lb: label g v = label g u) :
+        (* NOTE: [w2' = 0]! *)
+        item g (Node u) i l p2 q2 (w1 + w2 + omega g v u) (w1' + w2')
+          (Rmax (total g v i l w1 w1') (total g u j k w2 w2')).
 
 
 Theorem item_i_le_j : forall {vt nt} s i j p q w w' t (g : @Grammar vt nt)
@@ -192,6 +202,7 @@ Proof.
        | g l l' v v' i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
        | g l v i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rs Lb
        | g l l' v v' i j k p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh Fv Lb
+       | g v u i j k l p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Lb
        ].
   - reflexivity.
   - apply le_S. apply IHP.
@@ -200,7 +211,37 @@ Proof.
   - transitivity j. { apply IHL. } { apply IHP. }
   - transitivity j. { apply IHL. } { apply IHP. }
   - transitivity j. { apply IHL. } { apply IHP. }
+  - apply IHL.
 Qed.
+
+
+(*
+Theorem item_0_le_i : forall {vt nt} s i j p q w w' t (g : @Grammar vt nt)
+  (H: @item vt nt g s i j p q w w' t),
+    Nat.le 0 i.
+Proof.
+  intros vt nt s i j p q w w' t g.
+  intros eta.
+  induction eta
+    as [ g r i I L
+       | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
+       | g r v i j p q w w' _t P IHP Sh
+       | g l l' v i j k p1 q1 p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh
+       | g l l' v v' i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
+       | g l v i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rs Lb
+       | g l l' v v' i j k p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh Fv Lb
+       | g v u i j k l p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Lb
+       ].
+  - apply le_0_n.
+  - apply le_S. apply IHP.
+  - apply IHP.
+  - transitivity j. { apply IHL. } { apply IHP. }
+  - transitivity j. { apply IHL. } { apply IHP. }
+  - transitivity j. { apply IHL. } { apply IHP. }
+  - transitivity j. { apply IHL. } { apply IHP. }
+  - apply IHL.
+Qed.
+*)
 
 
 Theorem item_j_le_term_max : forall {vt nt} s i j p q w w' t (g : @Grammar vt nt)
@@ -217,6 +258,7 @@ Proof.
        | g l l' v v' i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
        | g l v i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rs Lb
        | g l l' v v' i j k p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh Fv Lb
+       | g v u i j k l p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Lb
        ].
   - rewrite Nat.add_1_r. apply le_S. apply L.
   - rewrite Nat.add_1_r. apply le_n_S. apply L.
@@ -225,6 +267,311 @@ Proof.
   - apply IHP.
   - apply IHP.
   - apply IHP.
+  - apply IHL.
+Qed.
+
+
+Theorem item_i_le_p : forall {vt nt} s i j x q w w' t (g : @Grammar vt nt)
+  (H: @item vt nt g s i j (Some x) q w w' t),
+    Nat.le i x.
+Proof.
+  intros vt nt s i j x q w w' t g.
+  intros eta.
+  (* Need to remember that [p] is [Some x] *)
+  remember (Some x) as p.
+  (* Generalizing [x] is crucial here! *)
+  generalize dependent x.
+  induction eta
+    as [ g r i I L
+       | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
+       | g r v i j p q w w' _t P IHP Sh
+       | g l l' v i j k p1 q1 p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh
+       | g l l' v v' i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
+       | g l v i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rs Lb
+       | g l l' v v' i j k p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh Fv Lb
+       | g v u i j k l p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Lb
+       ].
+  - intros x E. discriminate E.
+  - intros x E. apply IHP in E. apply E.
+  - intros x E. apply IHP in E. apply E.
+  - intros x E. destruct p1.
+    + simpl in E. apply IHL in E. apply E.
+    + simpl in E. apply IHP in E.
+      apply item_i_le_j in LP as E'.
+      transitivity j.
+      * apply E'.
+      * apply E.
+  - intros x E. apply IHL in E. apply E.
+  - intros x E. apply IHL in E. apply E.
+  - intros x E. injection E as E. rewrite <- E.
+    apply item_i_le_j in LP. apply LP.
+  - intros x E. apply IHP in E as Le_j_x.
+    assert (T: Some j = Some j). { reflexivity. }
+    apply IHL in T as Le_i_j.
+    transitivity j.
+    + apply Le_i_j.
+    + apply Le_j_x.
+Qed.
+
+
+Theorem item_some_p_iff_some_q : forall {vt nt} s i j p q w w' t (g : @Grammar vt nt)
+  (H: @item vt nt g s i j p q w w' t),
+    p = None <-> q = None.
+Proof.
+Admitted.
+
+
+Theorem item_p_le_q : forall {vt nt} s i j x y w w' t (g : @Grammar vt nt)
+  (H: @item vt nt g s i j (Some x) (Some y) w w' t),
+    Nat.le x y.
+Proof.
+  intros vt nt s i j x y w w' t g.
+  intros eta.
+  (* Need to remember that [p] is [Some x] *)
+  remember (Some x) as p.
+  remember (Some y) as q.
+  (* Generalizing [x] is crucial here! *)
+  generalize dependent y.
+  generalize dependent x.
+  induction eta
+    as [ g r i I L
+       | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
+       | g r v i j p q w w' _t P IHP Sh
+       | g l l' v i j k p1 q1 p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh
+       | g l l' v v' i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
+       | g l v i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rs Lb
+       | g l l' v v' i j k p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh Fv Lb
+       | g v u i j k l p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Lb
+       ].
+  - intros x E y F. discriminate E.
+  - apply IHP.
+  - apply IHP.
+  - intros x E y F.
+    assert (NoneEq: forall {A : Type}, @None A = @None A).
+      { intros A. reflexivity. }
+    destruct p1 eqn:Eq_p1.
+    + simpl in E.
+      destruct q1 eqn:Eq_q1.
+      * simpl in F.
+        apply IHL. apply E. apply F.
+      * exfalso. apply item_some_p_iff_some_q in LP.
+        destruct LP as [_ Abs].
+        apply Abs in NoneEq. discriminate NoneEq.
+    + simpl in E.
+      destruct q1 eqn:Eq_q1.
+      * exfalso. apply item_some_p_iff_some_q in LP.
+        destruct LP as [Abs _].
+        apply Abs in NoneEq. discriminate NoneEq.
+      * apply IHP. apply E. apply F.
+Admitted.
+
+
+Theorem item_q_le_j : forall {vt nt} s i j p x w w' t (g : @Grammar vt nt)
+  (H: @item vt nt g s i j p (Some x) w w' t),
+    Nat.le x j.
+Proof.
+  intros vt nt s i j p x w w' t g.
+  intros eta.
+  (* Need to remember that [p] is [Some x] *)
+  remember (Some x) as q.
+  (* Generalizing [x] is crucial here! *)
+  generalize dependent x.
+  induction eta
+    as [ g r i I L
+       | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
+       | g r v i j p q w w' _t P IHP Sh
+       | g l l' v i j k p1 q1 p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh
+       | g l l' v v' i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
+       | g l v i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rs Lb
+       | g l l' v v' i j k p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh Fv Lb
+       | g v u i j k l p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Lb
+       ].
+  - intros x E. discriminate E.
+  - intros x E. apply IHP in E. apply le_S. apply E.
+  - intros x E. apply IHP in E. apply E.
+  - intros x E. destruct q1.
+    + simpl in E. apply IHL in E.
+      apply item_i_le_j in RP as E'.
+      transitivity j.
+      * apply E.
+      * apply E'.
+    + simpl in E. apply IHP in E.
+      apply E.
+  - intros x E. apply IHL in E.
+    apply item_i_le_j in RP as E'.
+      transitivity j.
+      * apply E.
+      * apply E'.
+  - intros x E. apply IHL in E.
+    apply item_i_le_j in RP as E'.
+      transitivity j.
+      * apply E.
+      * apply E'.
+  - intros x E. injection E as E. rewrite <- E.
+    reflexivity.
+  - intros x E. apply IHP in E as Le_x_k.
+    assert (T: Some k = Some k). { reflexivity. }
+    apply IHL in T as Le_k_l.
+    transitivity k.
+    + apply Le_x_k.
+    + apply Le_k_l.
+Qed.
+
+
+Lemma costs_ignore_gap : forall {vt nt} i j k l (g : @Grammar vt nt),
+  Nat.le i j ->
+  Nat.le j k ->
+  Nat.le k l ->
+    costs g (in_span i j) + costs g (in_span k l) <= costs g (in_span i l).
+Proof.
+  intros vt nt i j k l g.
+  intros Le_i_j Le_j_k Le_k_l.
+  apply (Rle_trans _
+    (costs g (in_span i j) + costs g (in_span j k) + costs g (in_span k l))).
+  - apply Rplus_le_compat_r.
+    rewrite <- (Rplus_0_r (_ _ (in_span i j))).
+    rewrite Rplus_assoc.
+    apply Rplus_le_compat_l.
+    rewrite Rplus_0_l.
+    apply costs_ge_0.
+  - rewrite <- ?costs_app.
+    rewrite <- in_span_split.
+    Focus 2. apply Le_i_j.
+    Focus 2. apply Le_j_k.
+    rewrite <- in_span_split.
+    + apply Rle_refl.
+    + transitivity j.
+      * apply Le_i_j.
+      * apply Le_j_k.
+    + apply Le_k_l.
+Qed.
+
+
+Lemma costs_rest_gap : forall {vt nt} i j k l (g : @Grammar vt nt),
+  Nat.le 0 i ->
+  Nat.le i j ->
+  Nat.le j k ->
+  Nat.le k l ->
+  Nat.le l (term_max g + 1) ->
+    costs g (rest g j k) =
+      costs g (rest g i l) + costs g (in_span i j) + costs g (in_span k l).
+Proof.
+  intros vt nt i j k l g.
+  intros Le_0_i Le_i_j Le_j_k Le_k_l Le_l_max.
+  unfold rest.
+  rewrite ?costs_app.
+  rewrite ?(Rplus_shift_left (costs g (in_span i j))).
+  rewrite Rplus_assoc.
+
+  (* get rid of [costs g (in_span 0 j] *)
+  assert (H: costs g (in_span 0%nat j) =
+    costs g (in_span 0%nat i) + costs g (in_span i j)).
+    { rewrite <- costs_app.
+      rewrite <- in_span_split.
+      - reflexivity.
+      - apply Le_0_i.
+      - apply Le_i_j.
+    }
+  rewrite <- H.
+  apply Rplus_eq_compat_l.
+
+  (* get rid of the rest *)
+  rewrite Rplus_comm.
+  rewrite <- costs_app.
+  rewrite <- in_span_split.
+  - reflexivity.
+  - apply Le_k_l.
+  - apply Le_l_max.
+Qed.
+
+
+Theorem weights_ge_0 : forall {vt nt} s i j p q w w' t
+  (g : @Grammar vt nt) (H: @item vt nt g s i j p q w w' t),
+    0 <= w /\ 0 <= w'.
+Proof.
+  intros vt nt s i j p q w w' t g.
+  intros eta.
+
+  induction eta
+    as [ g r i I L
+       | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
+       | g r v i j p q w w' _t P IHP Sh
+       | g l l' v i j k p1 q1 p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh
+       | g l l' v v' i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
+       | g l v i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rs Lb
+       | g l l' v v' i j k p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh Fv Lb
+       | g v u i j k l p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Lb
+       ].
+
+  - split. apply Rle_refl. apply Rle_refl.
+
+  - apply IHP.
+
+  - apply IHP.
+
+  - destruct IHL as [L1 L2].
+    destruct IHP as [P1 P2].
+    split.
+    + rewrite <- (Rplus_0_l 0).
+      apply Rplus_le_compat.
+      * apply L1.
+      * apply P1.
+    + rewrite <- (Rplus_0_l 0).
+      apply Rplus_le_compat.
+      * apply L2.
+      * apply P2.
+
+  - destruct IHL as [L1 L2].
+    destruct IHP as [P1 P2].
+    split.
+    + rewrite <- (Rplus_0_l 0). rewrite <- (Rplus_0_r (0 + 0)).
+      apply Rplus_le_compat.
+        { apply Rplus_le_compat.
+          - apply L1.
+          - apply P1. }
+        { apply omega_ge_0. }
+    + rewrite <- (Rplus_0_l 0).
+      apply Rplus_le_compat.
+      * apply L2.
+      * apply P2.
+
+  - destruct IHL as [L1 L2].
+    destruct IHP as [P1 P2].
+    split.
+    + rewrite <- (Rplus_0_l 0). rewrite <- (Rplus_0_r (0 + 0)).
+      apply Rplus_le_compat.
+        { apply Rplus_le_compat.
+          - apply L1.
+          - apply P1. }
+        { apply omega_ge_0. }
+    + rewrite <- (Rplus_0_l 0).
+      apply Rplus_le_compat.
+      * apply L2.
+      * apply P2.
+
+  - destruct IHL as [L1 L2].
+    destruct IHP as [P1 P2].
+    split.
+    + apply L1.
+    + rewrite <- 2?(Rplus_0_l 0). rewrite ?Rplus_assoc.
+      apply Rplus_le_compat. { apply L2. }
+      apply Rplus_le_compat. { apply P1. }
+      apply Rplus_le_compat. { apply P2. }
+      apply amort_weight_ge_0.
+
+  - destruct IHL as [L1 L2].
+    destruct IHP as [P1 P2].
+    split.
+    + rewrite <- (Rplus_0_l 0). rewrite <- (Rplus_0_r (0 + 0)).
+      rewrite ?Rplus_assoc.
+      apply Rplus_le_compat. { apply L1. }
+      apply Rplus_le_compat. { apply P1. }
+      apply omega_ge_0.
+    + rewrite <- (Rplus_0_l 0).
+      apply Rplus_le_compat.
+      * apply L2.
+      * apply P2.
+
 Qed.
 
 
@@ -243,6 +590,7 @@ Proof.
        | g l l' v v' i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
        | g l v i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rs Lb
        | g l l' v v' i j k p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh Fv Lb
+       | g v u i j k l p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Lb
        ].
 
   - simpl. rewrite in_span_ii_empty.
@@ -361,6 +709,46 @@ Proof.
         simpl.
         apply costs_inf_le_amort_weight.
 
+  - (* RA *)
+
+    rewrite <- ?Rplus_assoc.
+    rewrite ?(Rplus_shift_left w1').
+    rewrite 1?(Rplus_shift_left (omega _ _ _)).
+    rewrite 2?Rplus_assoc.
+
+    (* split the span *)
+    rewrite (in_span_split i j l).
+    Focus 2. apply (item_i_le_p) in LP. apply LP.
+    Focus 2. apply (item_i_le_j) in RP.
+      apply item_q_le_j in LP.
+      transitivity k. apply RP. apply LP.
+    rewrite (in_span_split j k l).
+    Focus 2. apply item_i_le_j in RP. apply RP.
+    Focus 2. apply item_q_le_j in LP. apply LP.
+    rewrite ?costs_app.
+
+    (* align [in_span j k] *)
+    rewrite (Rplus_comm (costs g (in_span j k))).
+    rewrite <- Rplus_assoc.
+    apply Rplus_le_compat.
+    Focus 2. rewrite <- Rplus_assoc. apply IHP.
+
+    (* we still have to deal with [in_span i j] and [in_span j k] *)
+    apply (Rle_trans _ (costs g (in_span i l))).
+      { apply costs_ignore_gap.
+        - apply item_i_le_p in LP. apply LP.
+        - apply item_i_le_j in RP. apply RP.
+        - apply item_q_le_j in LP. apply LP.
+      }
+    apply (Rle_trans _ (w1 + w1' + costs g (inf_s g (Node v)))).
+      { apply IHL. }
+    apply Rplus_le_compat_l.
+
+    (* relation between [inf_s] and [omega] *)
+    move Rv after IHP.
+    apply (inf_cost_vs_omega _ _ u) in Rv as Ineq.
+    simpl. apply Ineq.
+
 Qed.
 
 
@@ -387,6 +775,26 @@ Proof.
 Qed.
 
 
+Lemma amort_le_omega : forall {vt nt}
+  (g : @Grammar vt nt) v u,
+    amort_weight g v <= omega g v u.
+Proof.
+  intros vt nt g v u.
+  unfold amort_weight.
+  unfold omega.
+  unfold Rminus.
+  rewrite (Rplus_comm _ (tree_weight _ _)).
+  rewrite Rplus_assoc.
+  apply Rplus_le_compat_l.
+  rewrite <- Rplus_0_r.
+  apply Rplus_le_compat.
+  - apply min_arc_weight_le.
+  - apply (Rplus_le_reg_r (costs g (sup g v))).
+    rewrite Rplus_opp_l. rewrite Rplus_0_l.
+    apply costs_ge_0.
+Qed.
+
+
 Theorem monotonic : forall {vt nt} s i j p q w w' t
   (g : @Grammar vt nt) (H: @item vt nt g s i j p q w w' t),
     t <= w + w' + heuristic_s g s i j.
@@ -402,6 +810,7 @@ Proof.
        | g l l' v v' i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP RP Rv Rs Le Lb Sh
        | g l v i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP RP Rs Lb
        | g l l' v v' i j k p2 q2 w1 w2 w1' w2' _t1 _t2 LP RP Sh Fv Lb
+       | g v u i j k l p2 q2 w1 w2 w1' w2' _t1 _t2 LP RP Rv Lb
        ].
 
   - (* AX *)
@@ -707,6 +1116,92 @@ Proof.
         Focus 2. apply EqNT.
         rewrite <- Inf.
         apply costs_inf_le_amort_weight'.
+
+  - (* RA *)
+
+    apply Rmax_Rle'. split.
+
+    + unfold total. simpl.
+
+      (* get rid of [w1 + w1'] *)
+      rewrite <- Rplus_assoc.
+      rewrite ?(Rplus_shift_left w1').
+      rewrite ?Rplus_assoc.
+      apply Rplus_le_compat_l. apply Rplus_le_compat_l.
+
+      unfold heuristic.
+
+      (* get rid of [rest g i l] *)
+      rewrite <- ?Rplus_assoc.
+      apply Rplus_le_compat_r.
+
+      (* match [amort_weight g v] and [omega g v u] *)
+      rewrite (Rplus_comm w2).
+      rewrite ?Rplus_assoc.
+      rewrite <- (Rplus_0_r (amort_weight g v)).
+      apply Rplus_le_compat.
+        { apply amort_le_omega. }
+
+      (* all elements on the right are positive *)
+      apply weights_ge_0 in RP as [Ineq Ineq'].
+      rewrite <- (Rplus_0_r 0). rewrite <- (Rplus_0_r (0 + 0)).
+      rewrite Rplus_assoc.
+      apply Rplus_le_compat. { apply Ineq. }
+      apply Rplus_le_compat. { apply Ineq'. }
+      apply amort_weight_ge_0.
+
+    + unfold total. simpl.
+
+      (* get rid of [w2 + w2'] *)
+      rewrite (Rplus_comm w1).
+      rewrite <- Rplus_assoc.
+      rewrite ?(Rplus_shift_left w2').
+      rewrite ?Rplus_assoc.
+      apply Rplus_le_compat_l.
+      apply Rplus_le_compat_l.
+
+      unfold heuristic.
+
+      (* get rid of [amort_weight g u] *)
+      rewrite <- ?Rplus_assoc.
+      rewrite ?(Rplus_shift_left (amort_weight _ _)).
+      rewrite (Rplus_comm w1).
+      rewrite ?Rplus_assoc.
+      apply Rplus_le_compat_l.
+
+      (* split the cost of the [rest] *)
+      rewrite (costs_rest_gap i _ _ l).
+      Focus 2. apply le_0_n.
+      Focus 2. apply item_i_le_p in LP. apply LP.
+      Focus 2. apply item_i_le_j in RP. apply RP.
+      Focus 2. apply item_q_le_j in LP. apply LP.
+      Focus 2. apply item_j_le_term_max in LP. apply LP.
+
+      (* get rid of [rest g i l] *)
+      rewrite <- ?Rplus_assoc.
+      rewrite ?(Rplus_shift_left (_ _ (rest _ _ _))).
+      rewrite (Rplus_comm w1).
+      rewrite ?Rplus_assoc.
+      apply Rplus_le_compat_l.
+
+      (* join the in-spans *)
+      apply (Rle_trans _ (costs g (in_span i l))).
+        { apply costs_ignore_gap.
+          - apply item_i_le_p in LP. apply LP.
+          - apply item_i_le_j in RP. apply RP.
+          - apply item_q_le_j in LP. apply LP.
+        }
+      apply (Rle_trans _ (w1 + w1' + costs g (inf_s g (Node v)))).
+        { apply (in_vs_inside _ _ _ (Some j) (Some k) _ _ _t1).
+          apply LP. }
+
+      (* get rid of [w1 + w1'] *)
+      rewrite <- Rplus_assoc.
+      rewrite ?(Rplus_shift_left w1').
+      apply Rplus_le_compat_l.
+
+      (* match costs with omega *)
+      apply inf_cost_vs_omega. apply Rv.
 
 Qed.
 
