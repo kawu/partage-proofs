@@ -236,4 +236,24 @@ Proof.
 Qed.
 
 
+Lemma amort_le_omega : forall {vt nt}
+  (g : @Grammar vt nt) v u,
+    amort_weight g v <= omega g v u.
+Proof.
+  intros vt nt g v u.
+  unfold amort_weight.
+  unfold omega.
+  unfold Rminus.
+  rewrite (Rplus_comm _ (tree_weight _ _)).
+  rewrite Rplus_assoc.
+  apply Rplus_le_compat_l.
+  rewrite <- Rplus_0_r.
+  apply Rplus_le_compat.
+  - apply min_arc_weight_le.
+  - apply (Rplus_le_reg_r (costs g (sup g v))).
+    rewrite Rplus_opp_l. rewrite Rplus_0_l.
+    apply costs_ge_0.
+Qed.
+
+
 Close Scope R_scope.

@@ -210,4 +210,73 @@ Proof.
 Qed.
 
 
+(** Span costs when ignoring the gap *)
+Lemma costs_ignore_gap : forall {vt nt} i j k l (g : @Grammar vt nt),
+  Nat.le i j ->
+  Nat.le j k ->
+  Nat.le k l ->
+    costs g (in_span i j) + costs g (in_span k l) <= costs g (in_span i l).
+Proof.
+  intros vt nt i j k l g.
+  intros Le_i_j Le_j_k Le_k_l.
+  apply (Rle_trans _
+    (costs g (in_span i j) + costs g (in_span j k) + costs g (in_span k l))).
+  - apply Rplus_le_compat_r.
+    rewrite <- (Rplus_0_r (_ _ (in_span i j))).
+    rewrite Rplus_assoc.
+    apply Rplus_le_compat_l.
+    rewrite Rplus_0_l.
+    apply costs_ge_0.
+  - rewrite <- ?costs_app.
+    rewrite <- in_span_split.
+    Focus 2. apply Le_i_j.
+    Focus 2. apply Le_j_k.
+    rewrite <- in_span_split.
+    + apply Rle_refl.
+    + transitivity j.
+      * apply Le_i_j.
+      * apply Le_j_k.
+    + apply Le_k_l.
+Qed.
+
+
+(** Rest cost of a gap *)
+Lemma costs_rest_gap : forall {vt nt} i j k l (g : @Grammar vt nt),
+  Nat.le 0 i ->
+  Nat.le i j ->
+  Nat.le j k ->
+  Nat.le k l ->
+  Nat.le l (term_max g + 1) ->
+    costs g (rest g j k) =
+      costs g (rest g i l) + costs g (in_span i j) + costs g (in_span k l).
+Proof.
+  intros vt nt i j k l g.
+  intros Le_0_i Le_i_j Le_j_k Le_k_l Le_l_max.
+  unfold rest.
+  rewrite ?costs_app.
+  rewrite ?(Rplus_shift_left (costs g (in_span i j))).
+  rewrite Rplus_assoc.
+
+  (* get rid of [costs g (in_span 0 j] *)
+  assert (H: costs g (in_span 0%nat j) =
+    costs g (in_span 0%nat i) + costs g (in_span i j)).
+    { rewrite <- costs_app.
+      rewrite <- in_span_split.
+      - reflexivity.
+      - apply Le_0_i.
+      - apply Le_i_j.
+    }
+  rewrite <- H.
+  apply Rplus_eq_compat_l.
+
+  (* get rid of the rest *)
+  rewrite Rplus_comm.
+  rewrite <- costs_app.
+  rewrite <- in_span_split.
+  - reflexivity.
+  - apply Le_k_l.
+  - apply Le_l_max.
+Qed.
+
+
 Close Scope R_scope.

@@ -215,35 +215,6 @@ Proof.
 Qed.
 
 
-(*
-Theorem item_0_le_i : forall {vt nt} s i j p q w w' t (g : @Grammar vt nt)
-  (H: @item vt nt g s i j p q w w' t),
-    Nat.le 0 i.
-Proof.
-  intros vt nt s i j p q w w' t g.
-  intros eta.
-  induction eta
-    as [ g r i I L
-       | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
-       | g r v i j p q w w' _t P IHP Sh
-       | g l l' v i j k p1 q1 p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh
-       | g l l' v v' i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
-       | g l v i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rs Lb
-       | g l l' v v' i j k p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh Fv Lb
-       | g v u i j k l p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Lb
-       ].
-  - apply le_0_n.
-  - apply le_S. apply IHP.
-  - apply IHP.
-  - transitivity j. { apply IHL. } { apply IHP. }
-  - transitivity j. { apply IHL. } { apply IHP. }
-  - transitivity j. { apply IHL. } { apply IHP. }
-  - transitivity j. { apply IHL. } { apply IHP. }
-  - apply IHL.
-Qed.
-*)
-
-
 Theorem item_j_le_term_max : forall {vt nt} s i j p q w w' t (g : @Grammar vt nt)
   (H: @item vt nt g s i j p q w w' t),
     Nat.le j (term_max g + 1).
@@ -318,13 +289,38 @@ Theorem item_some_p_iff_some_q : forall {vt nt} s i j p q w w' t (g : @Grammar v
   (H: @item vt nt g s i j p q w w' t),
     p = None <-> q = None.
 Proof.
-Admitted.
+  assert (NoneEq: forall {A : Type}, @None A = @None A).
+    { intros A. reflexivity. }
+  intros vt nt s i j p q w w' t g.
+  intros eta.
+  induction eta
+    as [ g r i I L
+       | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
+       | g r v i j p q w w' _t P IHP Sh
+       | g l l' v i j k p1 q1 p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh
+       | g l l' v v' i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
+       | g l v i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rs Lb
+       | g l l' v v' i j k p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh Fv Lb
+       | g v u i j k l p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Lb
+       ];
+  try reflexivity;
+  try (apply IHP);
+  try (apply IHL).
+  - destruct p1. destruct q1.
+    + split. { intros H. discriminate H. } { intros H. discriminate H. }
+    + exfalso. destruct IHL as [_ H]. apply H in NoneEq. discriminate.
+    + destruct IHL as [H _]. apply H in NoneEq as H'.
+      rewrite H'. simpl. apply IHP.
+  - split. { intros H. discriminate. } { intros H. discriminate H. }
+Qed.
 
 
 Theorem item_p_le_q : forall {vt nt} s i j x y w w' t (g : @Grammar vt nt)
   (H: @item vt nt g s i j (Some x) (Some y) w w' t),
     Nat.le x y.
 Proof.
+  assert (NoneEq: forall {A : Type}, @None A = @None A).
+    { intros A. reflexivity. }
   intros vt nt s i j x y w w' t g.
   intros eta.
   (* Need to remember that [p] is [Some x] *)
@@ -342,13 +338,11 @@ Proof.
        | g l v i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rs Lb
        | g l l' v v' i j k p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh Fv Lb
        | g v u i j k l p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Lb
-       ].
+       ];
+  try (apply IHL);
+  try (apply IHP).
   - intros x E y F. discriminate E.
-  - apply IHP.
-  - apply IHP.
   - intros x E y F.
-    assert (NoneEq: forall {A : Type}, @None A = @None A).
-      { intros A. reflexivity. }
     destruct p1 eqn:Eq_p1.
     + simpl in E.
       destruct q1 eqn:Eq_q1.
@@ -363,7 +357,10 @@ Proof.
         destruct LP as [Abs _].
         apply Abs in NoneEq. discriminate NoneEq.
       * apply IHP. apply E. apply F.
-Admitted.
+  - intros x E y F. injection E as E. injection F as F.
+    rewrite <- E. rewrite <- F.
+    apply item_i_le_j in RP. apply RP.
+Qed.
 
 
 Theorem item_q_le_j : forall {vt nt} s i j p x w w' t (g : @Grammar vt nt)
@@ -415,73 +412,6 @@ Proof.
     transitivity k.
     + apply Le_x_k.
     + apply Le_k_l.
-Qed.
-
-
-Lemma costs_ignore_gap : forall {vt nt} i j k l (g : @Grammar vt nt),
-  Nat.le i j ->
-  Nat.le j k ->
-  Nat.le k l ->
-    costs g (in_span i j) + costs g (in_span k l) <= costs g (in_span i l).
-Proof.
-  intros vt nt i j k l g.
-  intros Le_i_j Le_j_k Le_k_l.
-  apply (Rle_trans _
-    (costs g (in_span i j) + costs g (in_span j k) + costs g (in_span k l))).
-  - apply Rplus_le_compat_r.
-    rewrite <- (Rplus_0_r (_ _ (in_span i j))).
-    rewrite Rplus_assoc.
-    apply Rplus_le_compat_l.
-    rewrite Rplus_0_l.
-    apply costs_ge_0.
-  - rewrite <- ?costs_app.
-    rewrite <- in_span_split.
-    Focus 2. apply Le_i_j.
-    Focus 2. apply Le_j_k.
-    rewrite <- in_span_split.
-    + apply Rle_refl.
-    + transitivity j.
-      * apply Le_i_j.
-      * apply Le_j_k.
-    + apply Le_k_l.
-Qed.
-
-
-Lemma costs_rest_gap : forall {vt nt} i j k l (g : @Grammar vt nt),
-  Nat.le 0 i ->
-  Nat.le i j ->
-  Nat.le j k ->
-  Nat.le k l ->
-  Nat.le l (term_max g + 1) ->
-    costs g (rest g j k) =
-      costs g (rest g i l) + costs g (in_span i j) + costs g (in_span k l).
-Proof.
-  intros vt nt i j k l g.
-  intros Le_0_i Le_i_j Le_j_k Le_k_l Le_l_max.
-  unfold rest.
-  rewrite ?costs_app.
-  rewrite ?(Rplus_shift_left (costs g (in_span i j))).
-  rewrite Rplus_assoc.
-
-  (* get rid of [costs g (in_span 0 j] *)
-  assert (H: costs g (in_span 0%nat j) =
-    costs g (in_span 0%nat i) + costs g (in_span i j)).
-    { rewrite <- costs_app.
-      rewrite <- in_span_split.
-      - reflexivity.
-      - apply Le_0_i.
-      - apply Le_i_j.
-    }
-  rewrite <- H.
-  apply Rplus_eq_compat_l.
-
-  (* get rid of the rest *)
-  rewrite Rplus_comm.
-  rewrite <- costs_app.
-  rewrite <- in_span_split.
-  - reflexivity.
-  - apply Le_k_l.
-  - apply Le_l_max.
 Qed.
 
 
@@ -772,26 +702,6 @@ Proof.
     apply Rplus_le_compat.
     + apply min_arc_weight_le.
     + apply min_tree_weight_le. reflexivity.
-Qed.
-
-
-Lemma amort_le_omega : forall {vt nt}
-  (g : @Grammar vt nt) v u,
-    amort_weight g v <= omega g v u.
-Proof.
-  intros vt nt g v u.
-  unfold amort_weight.
-  unfold omega.
-  unfold Rminus.
-  rewrite (Rplus_comm _ (tree_weight _ _)).
-  rewrite Rplus_assoc.
-  apply Rplus_le_compat_l.
-  rewrite <- Rplus_0_r.
-  apply Rplus_le_compat.
-  - apply min_arc_weight_le.
-  - apply (Rplus_le_reg_r (costs g (sup g v))).
-    rewrite Rplus_opp_l. rewrite Rplus_0_l.
-    apply costs_ge_0.
 Qed.
 
 
@@ -1207,23 +1117,3 @@ Qed.
 
 
 Close Scope R_scope.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
