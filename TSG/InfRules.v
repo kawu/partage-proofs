@@ -379,13 +379,6 @@ Proof.
       rewrite Rplus_reord3.
       apply Rplus_le_compat_l.
 
-(*
-      rewrite (plus_comm w2).
-      rewrite (plus_comm (omega _ _ _)).
-      rewrite <- plus_assoc. rewrite <- plus_assoc.
-      apply combine_le. { reflexivity. }
-*)
-
       rewrite (cost_rest_plus_in_r g i j k).
       * apply Rplus_le_compat_l.
         apply (in_vs_inside_root _ _ _ _ _ _t2).
@@ -411,21 +404,6 @@ Proof.
 
       apply (Rplus_le_reg_r (costs g (inf' g l))).
       rewrite Rplus_reord1. rewrite Rplus_reord4.
-
-(*
-      rewrite plus_comm.
-      apply (plus_le_l _ _ (costs g (inf' g l))).
-      rewrite <- plus_assoc.
-
-      (* put everything in the right order *)
-      rewrite <- plus_assoc.
-      rewrite (plus_comm (amort_weight' g l')).
-      rewrite (plus_assoc (w1 + omega g v (fst l))).
-      rewrite <- (plus_assoc w1).
-      rewrite (plus_comm (omega _ _ _)).
-      rewrite (plus_assoc w1).
-      rewrite <- plus_assoc.
-*)
 
       apply Rplus_le_compat.
       * assert (H: inf_s g (Rule l) = inf' g l).
