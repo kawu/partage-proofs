@@ -347,6 +347,27 @@ Proof.
 Qed.
 
 
+Lemma shift_non_term_leaf_sup : forall {vt nt}
+  (g : @Grammar vt nt) r r' v x,
+    shift g r = Some (v, r') ->
+    leaf g v = true ->
+    label g v = NonTerm x ->
+      sup' g r' = sup' g r.
+Proof.
+  intros vt nt g r r' v x.
+  intros Sh H H'.
+  move Sh after H'.
+  apply (shift_non_term_leaf_inf _ _ _ _ x) in Sh as E.
+  destruct E as [_ InfEq].
+  Focus 2. apply H. Focus 2. apply H'.
+  apply shift_preserves_head in Sh as Head.
+  apply (head_inf_sup_eq g) in Head as E.
+  rewrite InfEq in E.
+  apply app_pref_eq in E.
+  rewrite E. reflexivity.
+Qed.
+
+
 Lemma shift_sup : forall {vt nt}
     (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
   shift g r' = Some (v, r) ->

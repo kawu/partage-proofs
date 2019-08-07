@@ -115,9 +115,6 @@ Proof.
 Qed.
 
 
-About Rplus_le_reg_r.
-
-
 Lemma costs_inf_le_amort_weight : forall {vt nt}
   (g : @Grammar vt nt) (v : vt),
     costs g (inf g v) <= amort_weight g v.
