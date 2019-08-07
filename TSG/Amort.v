@@ -115,6 +115,29 @@ Proof.
 Qed.
 
 
+About Rplus_le_reg_r.
+
+
+Lemma costs_inf_le_amort_weight : forall {vt nt}
+  (g : @Grammar vt nt) (r : vt*nat),
+    costs g (inf' g r) <= amort_weight' g r.
+Proof.
+  intros vt nt g r.
+  unfold amort_weight'.
+
+  apply (Rplus_le_reg_r (costs g (sup' g r))).
+  unfold Rminus.
+  rewrite Rplus_assoc. rewrite Rplus_opp_l. rewrite Rplus_0_r.
+  rewrite <- costs_app.
+  rewrite inf_plus_sup'.
+  unfold costs. simpl. rewrite Rplus_0_l.
+  unfold cost. rewrite Rplus_comm.
+  apply Rplus_le_compat.
+  - apply min_tree_weight_le. reflexivity.
+  - apply Rle_refl.
+Qed.
+
+
 Lemma shift_amort_weight : forall {vt nt}
     (g : @Grammar vt nt) (r r' : vt*nat) (v : vt),
   shift g r' = Some (v, r) ->

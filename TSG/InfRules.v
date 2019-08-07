@@ -130,10 +130,20 @@ Inductive item {vt nt}
       (LP: item g (Rule l) i j w1 _t1)
       (RP: item g (Node v) j k w2 _t2)
       (Rv: root g v = true)
+      (Rs: sister g v = false)
       (Le: leaf g v' = true)
       (Lb: label g v = label g v')
       (Sh: shift g l = Some (v', l')) :
         item g (Rule l') i k (w1 + w2 + omega g v (fst l))
+          (Rmax (total' g l i j w1) (total g v j k w2))
+  | sister_adjoin (g : @Grammar vt nt)
+      (l : vt*nat) (v : vt) (i j k : term) (w1 w2 _t1 _t2 : weight)
+      (LP: item g (Rule l) i j w1 _t1)
+      (RP: item g (Node v) j k w2 _t2)
+      (* (Rv: root g v = true) <- implied by [sister g v] *)
+      (Rs: sister g v = true)
+      (Lb: label g v = label g (fst l)) :
+        item g (Rule l) i k (w1 + w2 + omega g v (fst l))
           (Rmax (total' g l i j w1) (total g v j k w2)).
 
 
@@ -148,11 +158,13 @@ Proof.
        | g r1 r2 i j v w _t P IHP L Sh Lb
        | g r v i j w _t P IHP Sh
        | g l l' v i j k w1 w2 _t1 _t2 LP IHL RP IHP Sh
-       | g l l' v v' i j k w1 w2 _t1 _t2 LP IHL RP IHP Rv Le Lb Sh
+       | g l l' v v' i j k w1 w2 _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
+       | g l v i j k w1 w2 _t1 _t2 LP IHL RP IHP Rs Lb
        ].
   - reflexivity.
   - apply le_S. apply IHP.
   - apply IHP.
+  - transitivity j. { apply IHL. } { apply IHP. }
   - transitivity j. { apply IHL. } { apply IHP. }
   - transitivity j. { apply IHL. } { apply IHP. }
 Qed.
@@ -169,10 +181,12 @@ Proof.
        | g r1 r2 i j v w _t P IHP L Sh Lb
        | g r v i j w _t P IHP Sh
        | g l l' v i j k w1 w2 _t1 _t2 LP IHL RP IHP Sh
-       | g l l' v v' i j k w1 w2 _t1 _t2 LP IHL RP IHP Rv Le Lb Sh
+       | g l l' v v' i j k w1 w2 _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
+       | g l v i j k w1 w2 _t1 _t2 LP IHL RP IHP Rs Lb
        ].
   - rewrite Nat.add_1_r. apply le_S. apply L.
   - rewrite Nat.add_1_r. apply le_n_S. apply L.
+  - apply IHP.
   - apply IHP.
   - apply IHP.
   - apply IHP.
@@ -190,7 +204,8 @@ Proof.
        | g r1 r2 i j v w _t P IHP L Sh Lb
        | g r v i j w _t P IHP Sh
        | g l l' v i j k w1 w2 _t1 _t2 LP IHL RP IHP Sh
-       | g l l' v v' i j k w1 w2 _t1 _t2 LP IHL RP IHP Rv Le Lb Sh
+       | g l l' v v' i j k w1 w2 _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
+       | g l v i j k w1 w2 _t1 _t2 LP IHL RP IHP Rs Lb
        ].
   - simpl. rewrite in_span_ii_empty.
     rewrite costs_nil. rewrite Rplus_0_l.
@@ -219,7 +234,8 @@ Proof.
     apply Rplus_le_compat.
     + apply IHL.
     + apply IHP.
-  - rewrite (in_span_split i j k).
+  - (* SU *)
+    rewrite (in_span_split i j k).
     Focus 2. apply item_i_le_j in LP. apply LP.
     Focus 2. apply item_i_le_j in RP. apply RP.
     rewrite costs_app.
@@ -231,6 +247,22 @@ Proof.
       * simpl. rewrite Sh2. apply IHL.
       * apply Le.
       * rewrite Lb in Rv'. apply Rv'.
+    + apply (Rle_trans _ (w2 + costs g (inf g v))).
+      * apply IHP.
+      * apply Rplus_le_compat_l.
+        apply (inf_cost_vs_omega g v (fst l)).
+        apply Rv.
+  - (* SA *)
+    apply sister_is_root in Rs as Rv.
+    rewrite (in_span_split i j k).
+    Focus 2. apply item_i_le_j in LP. apply LP.
+    Focus 2. apply item_i_le_j in RP. apply RP.
+    rewrite costs_app.
+    rewrite Rplus_reord1.
+    apply Rplus_le_compat.
+    + apply root_non_term in Rv as Rv'.
+      destruct Rv' as [x Rv'].
+      apply IHL.
     + apply (Rle_trans _ (w2 + costs g (inf g v))).
       * apply IHP.
       * apply Rplus_le_compat_l.
@@ -274,7 +306,8 @@ Proof.
        | g r1 r2 i j v w _t P L Sh Lb
        | g r v i j w _t P Sh
        | g l l' v i j k w1 w2 _t1 _t2 LP RP Sh
-       | g l l' v v' i j k w1 w2 _t1 _t2 LP RP Rv Le Lb Sh
+       | g l l' v v' i j k w1 w2 _t1 _t2 LP RP Rv Rs Le Lb Sh
+       | g l v i j k w1 w2 _t1 _t2 LP RP Rs Lb
        ].
 
   - (* AX *)
@@ -427,6 +460,63 @@ Proof.
           apply Rplus_le_compat.
           - apply amort_weight_ge_0.
           - apply Rle_refl. }
+
+  - (* SA *)
+    apply sister_is_root in Rs as Rv.
+    apply root_non_term in Rv as H.
+    destruct H as [y RNonTerm].
+
+    apply Rmax_Rle'. split.
+
+    + unfold total'.
+      rewrite Rplus_assoc. rewrite Rplus_assoc.
+      apply Rplus_le_compat_l.
+      simpl. unfold heuristic'.
+
+      (* get rid of [amort_weight' g l] on both sides *)
+      rewrite Rplus_reord3.
+      apply Rplus_le_compat_l.
+
+      rewrite (cost_rest_plus_in_r g i j k).
+      * apply Rplus_le_compat_l.
+        apply (in_vs_inside_root _ _ _ _ _ _t2).
+        Focus 2. apply Rv.
+        apply RP.
+      * apply item_i_le_j in RP. apply RP.
+      * apply item_j_le_term_max in RP. apply RP.
+
+    + unfold total.
+
+      rewrite (Rplus_comm w1).
+      rewrite Rplus_assoc. rewrite Rplus_assoc.
+      apply Rplus_le_compat_l.
+
+      simpl. unfold heuristic. unfold heuristic'.
+
+      rewrite (cost_rest_plus_in_l g i j k).
+        Focus 2. apply item_i_le_j in LP. apply LP.
+
+      rewrite <- Rplus_assoc. rewrite <- Rplus_assoc.
+      rewrite <- Rplus_assoc.
+      apply Rplus_le_compat_r.
+
+      apply (Rplus_le_reg_r (costs g (inf' g l))).
+      rewrite Rplus_reord1. rewrite Rplus_reord4.
+
+      apply Rplus_le_compat.
+      * assert (H: inf_s g (Rule l) = inf' g l).
+          { simpl. reflexivity. }
+        rewrite <- H.
+        apply (in_vs_inside _ _ _ _ _t1). apply LP.
+      * apply Rplus_le_compat.
+        { unfold amort_weight. unfold omega.
+          rewrite (Rplus_comm (arc_weight _ _ _)).
+          apply sup_root in Rv as Rnil.
+          rewrite Rnil.
+          rewrite costs_nil. rewrite Rminus_0_r.
+          apply Rplus_le_compat_l.
+          apply min_arc_weight_le. }
+        { apply costs_inf_le_amort_weight. }
 
 Qed.
 

@@ -22,7 +22,7 @@ Inductive symbol {nt t} : Type :=
   | Terminal (x : t).
 
 
-(* Weight; TODO: real number? *)
+(** Weight represented as a real number *)
 Definition weight := R.
 
 
@@ -59,6 +59,8 @@ Record Grammar {vert non_term : Type} := mkGram
       (* is the given node a root of an ET? *)
   ; leaf : vert -> bool
       (* is the given node a leaf of an ET? *)
+  ; sister : vert -> bool
+      (* is the given node marked as a sister node? *)
   ; anchor : vert -> term
       (* anchor terminal of the ET containing the given node *)
   ; label : vert -> @symbol non_term term
@@ -69,6 +71,10 @@ Record Grammar {vert non_term : Type} := mkGram
       root v = true ->
         exists x, label v = NonTerm x
       (* label assigned to a root is a non-terminal *)
+
+  ; sister_is_root : forall v,
+      sister v = true -> root v = true
+      (* only root can be marked as a sister node *)
 
   ; parent : vert -> option vert
       (* parent of the given vertex (root => None) *)
