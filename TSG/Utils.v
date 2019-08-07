@@ -188,7 +188,13 @@ Qed.
 
 Lemma Rplus_shift_left : forall (c a b : R),
   a + b + c = a + c + b.
-Proof. Admitted.
+Proof.
+  intros c a b.
+  rewrite (Rplus_assoc a c).
+  rewrite (Rplus_comm c b).
+  rewrite <- Rplus_assoc.
+  reflexivity.
+Qed.
 
 
 Close Scope R_scope.
