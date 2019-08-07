@@ -61,9 +61,10 @@ Definition heuristic_s {vt nt}
 **)
 Definition total {vt nt}
   (g : @Grammar vt nt) (v : vt) (i j : term)
-  (w : weight) (* inside weight *)
+  (w : weight)  (* inside weight *)
+  (w' : weight) (* gap weight estimate *)
   : weight :=
-    w + heuristic g v i j.
+    w + w' + heuristic g v i j.
 
 
 (** Active item's total weight: the inside weight +
@@ -71,9 +72,10 @@ Definition total {vt nt}
 **)
 Definition total' {vt nt}
   (g : @Grammar vt nt) (r : vt*nat) (i j : term)
-  (w : weight) (* inside weight *)
+  (w : weight)  (* inside weight *)
+  (w' : weight) (* gap weight estimate *)
   : weight :=
-    w + heuristic' g r i j.
+    w + w' + heuristic' g r i j.
 
 
 (** Inferior terminals for the given spot **)
@@ -98,68 +100,74 @@ Inductive item {vt nt}
   -> weight
     (* inside weight *)
   -> weight
+    (* gap weight estimate *)
+  -> weight
     (* previous max total weight (or 0 if none) *)
   -> Prop :=
   | axiom (g : @Grammar vt nt) (r : vt*nat) (i : term)
       (I: In r (rules g))
       (L: Nat.le i (term_max g)) :
-        item g (Rule r) i i 0 0
+        item g (Rule r) i i 0 0 0
   | scan (g : @Grammar vt nt)
-      (r r' : vt*nat) (i : term) (j : term) (v : vt) (w _t : weight)
-      (P: item g (Rule r) i j w _t)
+      (r r' : vt*nat) (i : term) (j : term) (v : vt) (w w' _t : weight)
+      (P: item g (Rule r) i j w w' _t)
       (L: Nat.le j (term_max g))
       (Sh: shift g r = Some (v, r'))
       (Lb: label g v = Terminal j) :
-        item g (Rule r') i (S j) w
-          (total' g r i j w)
+        item g (Rule r') i (S j) w w'
+          (total' g r i j w w')
   | deact (g : @Grammar vt nt)
-      (r : vt*nat) (v : vt) (i j : term) (w _t : weight)
-      (P: item g (Rule r) i j w _t)
+      (r : vt*nat) (v : vt) (i j : term) (w w' _t : weight)
+      (P: item g (Rule r) i j w w' _t)
       (Sh: shift g r = None) :
-        item g (Node (fst r)) i j w
-          (total' g r i j w)
+        item g (Node (fst r)) i j w w'
+          (total' g r i j w w')
   | pseudo_subst (g : @Grammar vt nt)
-      (l l' : vt*nat) (v : vt) (i j k : term) (w1 w2 _t1 _t2 : weight)
-      (LP: item g (Rule l) i j w1 _t1)
-      (RP: item g (Node v) j k w2 _t2)
+      (l l' : vt*nat) (v : vt) (i j k : term)
+      (w1 w2 w1' w2' _t1 _t2 : weight)
+      (LP: item g (Rule l) i j w1 w1' _t1)
+      (RP: item g (Node v) j k w2 w2' _t2)
       (Sh: shift g l = Some (v, l')) :
-        item g (Rule l') i k (w1 + w2)
-          (Rmax (total' g l i j w1) (total g v j k w2))
+        item g (Rule l') i k (w1 + w2) (w1' + w2')
+          (Rmax (total' g l i j w1 w1') (total g v j k w2 w2'))
   | subst (g : @Grammar vt nt)
-      (l l' : vt*nat) (v v' : vt) (i j k : term) (w1 w2 _t1 _t2 : weight)
-      (LP: item g (Rule l) i j w1 _t1)
-      (RP: item g (Node v) j k w2 _t2)
+      (l l' : vt*nat) (v v' : vt) (i j k : term)
+      (w1 w2 w1' w2' _t1 _t2 : weight)
+      (LP: item g (Rule l) i j w1 w1' _t1)
+      (RP: item g (Node v) j k w2 w2' _t2)
       (Rv: root g v = true)
       (Rs: sister g v = false)
       (Le: leaf g v' = true)
       (Lb: label g v = label g v')
       (Sh: shift g l = Some (v', l')) :
-        item g (Rule l') i k (w1 + w2 + omega g v (fst l))
-          (Rmax (total' g l i j w1) (total g v j k w2))
+        (* NOTE: [w2' = 0]! *)
+        item g (Rule l') i k (w1 + w2 + omega g v (fst l)) (w1' + w2')
+          (Rmax (total' g l i j w1 w1') (total g v j k w2 w2'))
   | sister_adjoin (g : @Grammar vt nt)
-      (l : vt*nat) (v : vt) (i j k : term) (w1 w2 _t1 _t2 : weight)
-      (LP: item g (Rule l) i j w1 _t1)
-      (RP: item g (Node v) j k w2 _t2)
-      (* (Rv: root g v = true) <- implied by [sister g v] *)
+      (l : vt*nat) (v : vt) (i j k : term)
+      (w1 w2 w1' w2' _t1 _t2 : weight)
+      (LP: item g (Rule l) i j w1 w1' _t1)
+      (RP: item g (Node v) j k w2 w2' _t2)
       (Rs: sister g v = true)
       (Lb: label g v = label g (fst l)) :
-        item g (Rule l) i k (w1 + w2 + omega g v (fst l))
-          (Rmax (total' g l i j w1) (total g v j k w2)).
+        (* NOTE: [w2' = 0]! *)
+        item g (Rule l) i k (w1 + w2 + omega g v (fst l)) (w1' + w2')
+          (Rmax (total' g l i j w1 w1') (total g v j k w2 w2')).
 
 
-Theorem item_i_le_j : forall {vt nt} s i j w t (g : @Grammar vt nt)
-  (H: @item vt nt g s i j w t),
+Theorem item_i_le_j : forall {vt nt} s i j w w' t (g : @Grammar vt nt)
+  (H: @item vt nt g s i j w w' t),
     Nat.le i j.
 Proof.
-  intros vt nt s i j w t g.
+  intros vt nt s i j w w' t g.
   intros eta.
   induction eta
     as [ g r i I L
-       | g r1 r2 i j v w _t P IHP L Sh Lb
-       | g r v i j w _t P IHP Sh
-       | g l l' v i j k w1 w2 _t1 _t2 LP IHL RP IHP Sh
-       | g l l' v v' i j k w1 w2 _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
-       | g l v i j k w1 w2 _t1 _t2 LP IHL RP IHP Rs Lb
+       | g r1 r2 i j v w w' _t P IHP L Sh Lb
+       | g r v i j w w' _t P IHP Sh
+       | g l l' v i j k w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh
+       | g l l' v v' i j k w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
+       | g l v i j k w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rs Lb
        ].
   - reflexivity.
   - apply le_S. apply IHP.
@@ -170,19 +178,19 @@ Proof.
 Qed.
 
 
-Theorem item_j_le_term_max : forall {vt nt} s i j w t (g : @Grammar vt nt)
-  (H: @item vt nt g s i j w t),
+Theorem item_j_le_term_max : forall {vt nt} s i j w w' t (g : @Grammar vt nt)
+  (H: @item vt nt g s i j w w' t),
     Nat.le j (term_max g + 1).
 Proof.
-  intros vt nt s i j w t g.
+  intros vt nt s i j w w' t g.
   intros eta.
   induction eta
     as [ g r i I L
-       | g r1 r2 i j v w _t P IHP L Sh Lb
-       | g r v i j w _t P IHP Sh
-       | g l l' v i j k w1 w2 _t1 _t2 LP IHL RP IHP Sh
-       | g l l' v v' i j k w1 w2 _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
-       | g l v i j k w1 w2 _t1 _t2 LP IHL RP IHP Rs Lb
+       | g r1 r2 i j v w w' _t P IHP L Sh Lb
+       | g r v i j w w' _t P IHP Sh
+       | g l l' v i j k w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh
+       | g l l' v v' i j k w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
+       | g l v i j k w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rs Lb
        ].
   - rewrite Nat.add_1_r. apply le_S. apply L.
   - rewrite Nat.add_1_r. apply le_n_S. apply L.
@@ -193,25 +201,28 @@ Proof.
 Qed.
 
 
-Theorem in_vs_inside : forall {vt nt} s i j w t
-  (g : @Grammar vt nt) (H: @item vt nt g s i j w t),
-    costs g (in_span i j) <= w + costs g (inf_s g s).
+Theorem in_vs_inside : forall {vt nt} s i j w w' t
+  (g : @Grammar vt nt) (H: @item vt nt g s i j w w' t),
+    costs g (in_span i j) <= w + w' + costs g (inf_s g s).
 Proof.
-  intros vt nt s i j w t g.
+  intros vt nt s i j w w' t g.
   intros eta.
+
   induction eta
     as [ g r i I L
-       | g r1 r2 i j v w _t P IHP L Sh Lb
-       | g r v i j w _t P IHP Sh
-       | g l l' v i j k w1 w2 _t1 _t2 LP IHL RP IHP Sh
-       | g l l' v v' i j k w1 w2 _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
-       | g l v i j k w1 w2 _t1 _t2 LP IHL RP IHP Rs Lb
+       | g r1 r2 i j v w w' _t P IHP L Sh Lb
+       | g r v i j w w' _t P IHP Sh
+       | g l l' v i j k w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh
+       | g l l' v v' i j k w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
+       | g l v i j k w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rs Lb
        ].
+
   - simpl. rewrite in_span_ii_empty.
-    rewrite costs_nil. rewrite Rplus_0_l.
+    rewrite costs_nil. rewrite Rplus_0_l. rewrite Rplus_0_l.
     apply costs_ge_0.
+
   - rewrite in_span_Sj.
-    Focus 2. apply (item_i_le_j (Rule r1) i j w _t g). apply P.
+    Focus 2. apply (item_i_le_j (Rule r1) i j w w' _t g). apply P.
     simpl. rewrite (shift_term_inf g r1 r2 v j).
     + rewrite costs_app. rewrite costs_app.
       rewrite <- Rplus_assoc.
@@ -219,101 +230,128 @@ Proof.
       apply IHP.
     + apply Sh.
     + apply Lb.
+
   - simpl. simpl in IHP.
     apply shift_inf_passive in Sh as H.
     rewrite <- H.
     apply IHP.
-  - rewrite (in_span_split i j k).
+
+  - (* PS *)
+    rewrite (in_span_split i j k).
     Focus 2. apply item_i_le_j in LP. apply LP.
     Focus 2. apply item_i_le_j in RP. apply RP.
     rewrite costs_app.
     apply shift_inf in Sh as E.
     simpl.
     rewrite <- E. rewrite costs_app.
+    (* reorder the weights *)
+    rewrite (Rplus_assoc w1 w2).
+    rewrite <- (Rplus_assoc w2).
+    rewrite (Rplus_reord4 w2 w1').
+    rewrite <- (Rplus_assoc w1).
+    (* one final reordering *)
     rewrite Rplus_reord2.
     apply Rplus_le_compat.
     + apply IHL.
     + apply IHP.
+
   - (* SU *)
+    rewrite <- Rplus_assoc.
+    rewrite ?(Rplus_shift_left w1').
+    rewrite 3?(Rplus_shift_left (costs _ _)).
+    rewrite (Rplus_shift_left w2').
+
     rewrite (in_span_split i j k).
     Focus 2. apply item_i_le_j in LP. apply LP.
     Focus 2. apply item_i_le_j in RP. apply RP.
     rewrite costs_app.
-    rewrite Rplus_reord1.
+    rewrite 2?Rplus_assoc.
     apply Rplus_le_compat.
+
     + apply root_non_term in Rv as Rv'.
       destruct Rv' as [x Rv'].
       apply (shift_non_term_leaf_inf _ _ _ _ x) in Sh as [Sh1 Sh2].
       * simpl. rewrite Sh2. apply IHL.
       * apply Le.
       * rewrite Lb in Rv'. apply Rv'.
-    + apply (Rle_trans _ (w2 + costs g (inf g v))).
+
+    + apply (Rle_trans _ (w2 + w2' + costs g (inf g v))).
       * apply IHP.
-      * apply Rplus_le_compat_l.
+      * rewrite Rplus_assoc.
+        apply Rplus_le_compat_l. apply Rplus_le_compat_l.
         apply (inf_cost_vs_omega g v (fst l)).
         apply Rv.
+
   - (* SA *)
     apply sister_is_root in Rs as Rv.
+
+    rewrite <- Rplus_assoc.
+    rewrite ?(Rplus_shift_left w1').
+    rewrite 3?(Rplus_shift_left (costs _ _)).
+    rewrite (Rplus_shift_left w2').
+    rewrite 2?Rplus_assoc.
+
     rewrite (in_span_split i j k).
     Focus 2. apply item_i_le_j in LP. apply LP.
     Focus 2. apply item_i_le_j in RP. apply RP.
     rewrite costs_app.
-    rewrite Rplus_reord1.
+    (* rewrite Rplus_reord1. *)
     apply Rplus_le_compat.
     + apply root_non_term in Rv as Rv'.
       destruct Rv' as [x Rv'].
       apply IHL.
-    + apply (Rle_trans _ (w2 + costs g (inf g v))).
+    + apply (Rle_trans _ (w2 + w2' + costs g (inf g v))).
       * apply IHP.
-      * apply Rplus_le_compat_l.
+      * rewrite Rplus_assoc.
+        apply Rplus_le_compat_l. apply Rplus_le_compat_l.
         apply (inf_cost_vs_omega g v (fst l)).
         apply Rv.
 Qed.
 
 
-Theorem in_vs_inside_root : forall {vt nt} v v' i j w t
-  (g : @Grammar vt nt) (H: @item vt nt g (Node v) i j w t),
+Theorem in_vs_inside_root : forall {vt nt} v v' i j w w' t
+  (g : @Grammar vt nt) (H: @item vt nt g (Node v) i j w w' t),
     root g v = true ->
-      costs g (in_span i j) <= w + omega g v v'.
+      costs g (in_span i j) <= w + w' + omega g v v'.
 Proof.
-  intros vt nt v v' i j w t g I R.
-  apply (Rle_trans _ (w + costs g (inf g v))).
+  intros vt nt v v' i j w w' t g I R.
+  apply (Rle_trans _ (w + w' + costs g (inf g v))).
   - assert (H: inf_s g (Node v) = inf g v).
       { simpl. reflexivity. }
-    rewrite <- H. apply (in_vs_inside _ _ _ _ t). apply I.
+    rewrite <- H. apply (in_vs_inside _ _ _ _ w' t). apply I.
   - apply Rplus_le_compat_l.
     apply (inf_root_anchor) in R as A.
     rewrite A.
     unfold costs. simpl.
+    rewrite Rplus_0_l.
     unfold omega.
     unfold cost.
-    rewrite Rplus_0_l.
     apply Rplus_le_compat.
     + apply min_arc_weight_le.
     + apply min_tree_weight_le. reflexivity.
 Qed.
 
 
-Theorem monotonic : forall {vt nt} s i j w t
-  (g : @Grammar vt nt) (H: @item vt nt g s i j w t),
-    t <= w + heuristic_s g s i j.
+Theorem monotonic : forall {vt nt} s i j w w' t
+  (g : @Grammar vt nt) (H: @item vt nt g s i j w w' t),
+    t <= w + w' + heuristic_s g s i j.
 Proof.
-  intros vt nt s i j w t g.
+  intros vt nt s i j w w' t g.
   intros eta.
 
   destruct eta
     as [ g r i I L
-       | g r1 r2 i j v w _t P L Sh Lb
-       | g r v i j w _t P Sh
-       | g l l' v i j k w1 w2 _t1 _t2 LP RP Sh
-       | g l l' v v' i j k w1 w2 _t1 _t2 LP RP Rv Rs Le Lb Sh
-       | g l v i j k w1 w2 _t1 _t2 LP RP Rs Lb
+       | g r1 r2 i j v w w' _t P L Sh Lb
+       | g r v i j w w' _t P Sh
+       | g l l' v i j k w1 w2 w1' w2' _t1 _t2 LP RP Sh
+       | g l l' v v' i j k w1 w2 w1' w2' _t1 _t2 LP RP Rv Rs Le Lb Sh
+       | g l v i j k w1 w2 w1' w2' _t1 _t2 LP RP Rs Lb
        ].
 
   - (* AX *)
     (* simpl. rewrite Rplus_0_l.
     unfold heuristic'. *)
-    rewrite Rplus_0_l.
+    rewrite Rplus_0_l. rewrite Rplus_0_l.
     simpl.
     unfold heuristic'.
     rewrite <- (Rplus_0_l 0).
@@ -349,11 +387,11 @@ Proof.
     apply Rmax_Rle'. split.
 
     + simpl. unfold total'.
-      rewrite Rplus_assoc.
+      rewrite Rplus_reord2. rewrite (Rplus_assoc (w1 + _)).
       apply Rplus_le_compat_l.
       unfold heuristic'.
       apply shift_amort_weight in Sh as Sh'. rewrite Sh'.
-      rewrite Rplus_assoc. rewrite (Rplus_comm w2).
+      rewrite (Rplus_assoc (amort_weight' _ _)). rewrite (Rplus_comm (w2 + w2')).
       rewrite Rplus_assoc.
       apply Rplus_le_compat_l.
       rewrite (cost_rest_plus_in_r g i j k).
@@ -364,27 +402,28 @@ Proof.
         assert (H: inf_s g (Node v) = inf g v).
           { simpl. reflexivity. }
         rewrite <- H.
-        apply (in_vs_inside (Node v) j k w2 _t2).
+        apply (in_vs_inside (Node v) j k w2 w2' _t2).
         apply RP.
       * apply item_i_le_j in RP. apply RP.
       * apply item_j_le_term_max in RP. apply RP.
 
     + unfold total. simpl.
-      rewrite (Rplus_comm w1).
-      rewrite Rplus_assoc.
+      rewrite Rplus_reord2.
+      rewrite (Rplus_comm (w1 + _)).
+      rewrite (Rplus_assoc (w2 + _)).
       apply Rplus_le_compat_l.
       unfold heuristic. unfold heuristic'.
       rewrite (cost_rest_plus_in_l g i j k).
         Focus 2. apply item_i_le_j in LP. apply LP.
       rewrite <- Rplus_assoc. rewrite <- Rplus_assoc.
       apply Rplus_le_compat_r.
-      rewrite (Rplus_comm w1).
       apply shift_amort_weight' in Sh as Sh'.
-      rewrite <- Sh'. rewrite Rplus_assoc.
+      rewrite <- Sh'.
+      rewrite Rplus_assoc. rewrite Rplus_reord3.
       apply Rplus_le_compat_l. rewrite Rplus_comm.
       assert (H: inf_s g (Rule l) = inf' g l). { simpl. reflexivity. }
       rewrite <- H.
-      apply (in_vs_inside _ _ _ _ _t1). apply LP.
+      apply (in_vs_inside _ _ _ _ _ _t1). apply LP.
 
 
   - (* SU *)
@@ -398,7 +437,10 @@ Proof.
     apply Rmax_Rle'. split.
 
     + unfold total'.
-      rewrite Rplus_assoc. rewrite Rplus_assoc.
+      rewrite (Rplus_shift_left (w1' + _)).
+      rewrite <- Rplus_assoc.
+      rewrite (Rplus_shift_left w1').
+      rewrite ?(Rplus_assoc (w1 + _)).
       apply Rplus_le_compat_l.
 
       simpl. unfold heuristic'.
@@ -409,12 +451,16 @@ Proof.
       rewrite Rplus_0_r.
 
       (* get rid of [amort_weight' g l] on both sides *)
-      rewrite Rplus_reord3.
+      rewrite <- Rplus_assoc.
+      rewrite ?(Rplus_shift_left (amort_weight' _ _)).
+      rewrite (Rplus_comm w2).
+      rewrite ?Rplus_assoc.
       apply Rplus_le_compat_l.
 
       rewrite (cost_rest_plus_in_r g i j k).
-      * apply Rplus_le_compat_l.
-        apply (in_vs_inside_root _ _ _ _ _ _t2).
+      * rewrite Rplus_comm. rewrite <- ?Rplus_assoc.
+        apply Rplus_le_compat_r.
+        apply (in_vs_inside_root _ _ _ _ _ _ _t2).
         Focus 2. apply Rv.
         apply RP.
       * apply item_i_le_j in RP. apply RP.
@@ -422,8 +468,12 @@ Proof.
 
     + unfold total.
 
+      rewrite <- Rplus_assoc.
       rewrite (Rplus_comm w1).
-      rewrite Rplus_assoc. rewrite Rplus_assoc.
+      rewrite ?(Rplus_shift_left w2').
+      rewrite ?Rplus_assoc.
+
+      apply Rplus_le_compat_l.
       apply Rplus_le_compat_l.
 
       simpl. unfold heuristic. unfold heuristic'.
@@ -431,18 +481,18 @@ Proof.
       rewrite (cost_rest_plus_in_l g i j k).
         Focus 2. apply item_i_le_j in LP. apply LP.
 
-      rewrite <- Rplus_assoc. rewrite <- Rplus_assoc.
-      rewrite <- Rplus_assoc.
+      rewrite <- ?Rplus_assoc.
       apply Rplus_le_compat_r.
 
       apply (Rplus_le_reg_r (costs g (inf' g l))).
+      rewrite (Rplus_shift_left w1').
       rewrite Rplus_reord1. rewrite Rplus_reord4.
 
       apply Rplus_le_compat.
       * assert (H: inf_s g (Rule l) = inf' g l).
           { simpl. reflexivity. }
         rewrite <- H.
-        apply (in_vs_inside _ _ _ _ _t1). apply LP.
+        apply (in_vs_inside _ _ _ _ _ _t1). apply LP.
       * apply Rplus_le_compat.
         { unfold amort_weight. unfold omega.
           rewrite (Rplus_comm (arc_weight _ _ _)).
@@ -469,17 +519,25 @@ Proof.
     apply Rmax_Rle'. split.
 
     + unfold total'.
-      rewrite Rplus_assoc. rewrite Rplus_assoc.
-      apply Rplus_le_compat_l.
+
+      rewrite <- Rplus_assoc.
+      rewrite ?(Rplus_shift_left w1').
+      rewrite ?Rplus_assoc.
+      apply Rplus_le_compat_l. apply Rplus_le_compat_l.
       simpl. unfold heuristic'.
 
       (* get rid of [amort_weight' g l] on both sides *)
-      rewrite Rplus_reord3.
+      rewrite <- ?Rplus_assoc.
+      rewrite ?(Rplus_shift_left (amort_weight' _ _)).
+      rewrite (Rplus_comm w2).
+      rewrite ?Rplus_assoc.
       apply Rplus_le_compat_l.
 
       rewrite (cost_rest_plus_in_r g i j k).
-      * apply Rplus_le_compat_l.
-        apply (in_vs_inside_root _ _ _ _ _ _t2).
+      * rewrite Rplus_comm. rewrite <- ?Rplus_assoc.
+        apply Rplus_le_compat_r.
+        rewrite (Rplus_shift_left w2').
+        apply (in_vs_inside_root _ _ _ _ _ _ _t2).
         Focus 2. apply Rv.
         apply RP.
       * apply item_i_le_j in RP. apply RP.
@@ -488,26 +546,28 @@ Proof.
     + unfold total.
 
       rewrite (Rplus_comm w1).
-      rewrite Rplus_assoc. rewrite Rplus_assoc.
-      apply Rplus_le_compat_l.
+      rewrite <- Rplus_assoc.
+      rewrite ?(Rplus_shift_left w2').
+      rewrite ?Rplus_assoc.
+      apply Rplus_le_compat_l. apply Rplus_le_compat_l.
 
       simpl. unfold heuristic. unfold heuristic'.
 
       rewrite (cost_rest_plus_in_l g i j k).
         Focus 2. apply item_i_le_j in LP. apply LP.
 
-      rewrite <- Rplus_assoc. rewrite <- Rplus_assoc.
-      rewrite <- Rplus_assoc.
+      rewrite <- ?Rplus_assoc.
       apply Rplus_le_compat_r.
 
       apply (Rplus_le_reg_r (costs g (inf' g l))).
+      rewrite ?(Rplus_shift_left w1').
       rewrite Rplus_reord1. rewrite Rplus_reord4.
 
       apply Rplus_le_compat.
       * assert (H: inf_s g (Rule l) = inf' g l).
           { simpl. reflexivity. }
         rewrite <- H.
-        apply (in_vs_inside _ _ _ _ _t1). apply LP.
+        apply (in_vs_inside _ _ _ _ _ _t1). apply LP.
       * apply Rplus_le_compat.
         { unfold amort_weight. unfold omega.
           rewrite (Rplus_comm (arc_weight _ _ _)).

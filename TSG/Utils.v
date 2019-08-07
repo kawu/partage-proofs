@@ -186,4 +186,9 @@ Proof.
 Qed.
 
 
+Lemma Rplus_shift_left : forall (c a b : R),
+  a + b + c = a + c + b.
+Proof. Admitted.
+
+
 Close Scope R_scope.

@@ -61,6 +61,8 @@ Record Grammar {vert non_term : Type} := mkGram
       (* is the given node a leaf of an ET? *)
   ; sister : vert -> bool
       (* is the given node marked as a sister node? *)
+  ; foot : vert -> bool
+      (* is the given node marked as a sister node? *)
   ; anchor : vert -> term
       (* anchor terminal of the ET containing the given node *)
   ; label : vert -> @symbol non_term term
@@ -71,10 +73,13 @@ Record Grammar {vert non_term : Type} := mkGram
       root v = true ->
         exists x, label v = NonTerm x
       (* label assigned to a root is a non-terminal *)
-
   ; sister_is_root : forall v,
       sister v = true -> root v = true
       (* only root can be marked as a sister node *)
+  ; foot_is_non_term_leaf : forall v,
+      foot v = true ->
+        leaf v = true /\ exists x, label v = NonTerm x
+      (* only non terminal leaf can be marked as a sister node *)
 
   ; parent : vert -> option vert
       (* parent of the given vertex (root => None) *)
