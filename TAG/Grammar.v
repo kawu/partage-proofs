@@ -165,6 +165,7 @@ Record Grammar {vert non_term : Type} := mkGram
       shift r = None ->
         inf' r = inf (fst r)
 
+(*
   ; shift_term_inf : forall r r' v i,
       shift r = Some (v, r') ->
       label v = Terminal (Some i) ->
@@ -174,6 +175,7 @@ Record Grammar {vert non_term : Type} := mkGram
       shift r = Some (v, r') ->
       label v = Terminal None ->
         inf' r' = inf' r
+*)
 
   ; shift_non_term_leaf_inf : forall r r' v x,
       shift r = Some (v, r') ->
@@ -188,6 +190,10 @@ Record Grammar {vert non_term : Type} := mkGram
   ; term_inf : forall v i,
       label v = Terminal (Some i) ->
         inf v = [i]
+
+  ; empty_inf : forall v,
+      label v = Terminal None ->
+        inf v = []
 
   ; shift_preserves_tree_weight : forall l v l',
       shift l = Some (v, l') ->
@@ -250,6 +256,39 @@ Proof.
   apply (Rle_trans _ (min_arc_weight g x)).
   - apply min_arc_weight_ge_0.
   - apply min_arc_weight_le.
+Qed.
+
+
+Lemma shift_term_inf : forall {vt nt}
+  (g : @Grammar vt nt) (r r' : vt*nat) v i,
+    shift g r = Some (v, r') ->
+    label g v = Terminal (Some i) ->
+      inf' g r' = inf' g r ++ [i].
+Proof.
+  intros vt nt g r r' v i.
+  intros Sh Lb.
+  apply shift_inf in Sh as Inf.
+  rewrite <- Inf.
+  apply app_pref_eq'.
+  apply term_inf.
+  apply Lb.
+Qed.
+
+
+Lemma shift_empty_inf : forall {vt nt}
+  (g : @Grammar vt nt) (r r' : vt*nat) v,
+    shift g r = Some (v, r') ->
+    label g v = Terminal None ->
+      inf' g r' = inf' g r.
+Proof.
+  intros vt nt g r r' v.
+  intros Sh Lb.
+  apply shift_inf in Sh as Inf.
+  rewrite <- Inf.
+  rewrite <- app_nil_r.
+  apply app_pref_eq'.
+  apply empty_inf.
+  apply Lb.
 Qed.
 
 
