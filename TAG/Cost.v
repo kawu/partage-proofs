@@ -279,4 +279,54 @@ Proof.
 Qed.
 
 
+Lemma costs_sup_le : forall {vt nt}
+  (g : @Grammar vt nt) (v : vt) t,
+    anchor g v = t ->
+      costs g (sup g v) <= min_arc_weight g t + tree_weight g v.
+Proof.
+  intros vt nt g v t.
+  intros A.
+  destruct sup eqn:E.
+  - unfold costs. simpl.
+    rewrite <- (Rplus_0_l 0).
+    apply Rplus_le_compat.
+    + apply min_arc_weight_ge_0.
+    + apply tree_weight_ge_0.
+  - apply sup_destr in E as [H Lempty].
+    rewrite Lempty. rewrite cost_one.
+    unfold cost.
+    rewrite A in H. rewrite H.
+    apply Rplus_le_compat.
+    + apply Rle_refl.
+    + apply min_tree_weight_le.
+      apply A.
+Qed.
+
+
+Lemma costs_sup'_le : forall {vt nt}
+  (g : @Grammar vt nt) r v t,
+    fst r = v ->
+    anchor g v = t ->
+      costs g (sup' g r) <= min_arc_weight g t + tree_weight g v.
+Proof.
+  intros vt nt g r v t.
+  intros F A.
+  destruct sup' eqn:E.
+  - unfold costs. simpl.
+    rewrite <- (Rplus_0_l 0).
+    apply Rplus_le_compat.
+    + apply min_arc_weight_ge_0.
+    + apply tree_weight_ge_0.
+  - apply sup'_destr in E as [H Lempty].
+    rewrite Lempty. rewrite cost_one.
+    unfold cost.
+    rewrite F in H.
+    rewrite A in H. rewrite H.
+    apply Rplus_le_compat.
+    + apply Rle_refl.
+    + apply min_tree_weight_le.
+      apply A.
+Qed.
+
+
 Close Scope R_scope.

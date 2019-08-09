@@ -16,57 +16,6 @@ From LF Require Import Cost.
 Open Scope R_scope.
 
 
-(** TODO: move to Cost *)
-Lemma costs_sup_le : forall {vt nt}
-  (g : @Grammar vt nt) (v : vt) t,
-    anchor g v = t ->
-      costs g (sup g v) <= min_arc_weight g t + tree_weight g v.
-Proof.
-  intros vt nt g v t.
-  intros A.
-  destruct sup eqn:E.
-  - unfold costs. simpl.
-    rewrite <- (Rplus_0_l 0).
-    apply Rplus_le_compat.
-    + apply min_arc_weight_ge_0.
-    + apply tree_weight_ge_0.
-  - apply sup_destr in E as [H Lempty].
-    rewrite Lempty. rewrite cost_one.
-    unfold cost.
-    rewrite A in H. rewrite H.
-    apply Rplus_le_compat.
-    + apply Rle_refl.
-    + apply min_tree_weight_le.
-      apply A.
-Qed.
-
-
-Lemma costs_sup'_le : forall {vt nt}
-  (g : @Grammar vt nt) r v t,
-    fst r = v ->
-    anchor g v = t ->
-      costs g (sup' g r) <= min_arc_weight g t + tree_weight g v.
-Proof.
-  intros vt nt g r v t.
-  intros F A.
-  destruct sup' eqn:E.
-  - unfold costs. simpl.
-    rewrite <- (Rplus_0_l 0).
-    apply Rplus_le_compat.
-    + apply min_arc_weight_ge_0.
-    + apply tree_weight_ge_0.
-  - apply sup'_destr in E as [H Lempty].
-    rewrite Lempty. rewrite cost_one.
-    unfold cost.
-    rewrite F in H.
-    rewrite A in H. rewrite H.
-    apply Rplus_le_compat.
-    + apply Rle_refl.
-    + apply min_tree_weight_le.
-      apply A.
-Qed.
-
-
 (** Amortized weight of the given passive parsing configuration *)
 Definition amort_weight {vt nt} (g : @Grammar vt nt) (n : vt) : weight :=
   tree_weight g n + min_arc_weight g (anchor g n) - costs g (sup g n).
@@ -100,6 +49,7 @@ Lemma amort_weight'_ge_0 : forall {vt nt}
     (g : @Grammar vt nt) (r : vt*nat),
   0 <= amort_weight' g r.
 Proof.
+  (* TODO: prove in terms of costs_inf_le_amort_weight'? *)
   intros vt nt g r.
   unfold amort_weight'.
   apply (Rplus_le_reg_r (costs g (sup' g r))).
