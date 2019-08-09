@@ -19,7 +19,7 @@ Definition term := nat.
 (** Symbol assigned to a node in the grammar *)
 Inductive symbol {nt t} : Type :=
   | NonTerm (x : nt)
-  | Terminal (x : t).
+  | Terminal (x : option t). (* terminal can be empty ([None]) *)
 
 
 (** Weight represented as a real number *)
@@ -167,8 +167,13 @@ Record Grammar {vert non_term : Type} := mkGram
 
   ; shift_term_inf : forall r r' v i,
       shift r = Some (v, r') ->
-      label v = Terminal i ->
+      label v = Terminal (Some i) ->
         inf' r' = inf' r ++ [i]
+
+  ; shift_empty_inf : forall r r' v,
+      shift r = Some (v, r') ->
+      label v = Terminal None ->
+        inf' r' = inf' r
 
   ; shift_non_term_leaf_inf : forall r r' v x,
       shift r = Some (v, r') ->
@@ -181,7 +186,7 @@ Record Grammar {vert non_term : Type} := mkGram
         inf' r = inf (fst r)
 
   ; term_inf : forall v i,
-      label v = Terminal i ->
+      label v = Terminal (Some i) ->
         inf v = [i]
 
   ; shift_preserves_tree_weight : forall l v l',

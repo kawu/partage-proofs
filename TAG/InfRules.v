@@ -125,8 +125,16 @@ Inductive item {vt nt}
       (P: item g (Rule r) i j p q w w' _t)
       (L: Nat.le j (term_max g))
       (Sh: shift g r = Some (v, r'))
-      (Lb: label g v = Terminal j) :
+      (Lb: label g v = Terminal (Some j)) :
         item g (Rule r') i (S j) p q w w'
+          (total' g r i j w w')
+  | scan_empty (g : @Grammar vt nt)
+      (r r' : vt*nat) (i j : term) p q (v : vt) (w w' _t : weight)
+      (P: item g (Rule r) i j p q w w' _t)
+      (L: Nat.le j (term_max g))
+      (Sh: shift g r = Some (v, r'))
+      (Lb: label g v = Terminal None) :
+        item g (Rule r') i j p q w w'
           (total' g r i j w w')
   | deact (g : @Grammar vt nt)
       (r : vt*nat) (v : vt) (i j : term) p q (w w' _t : weight)
@@ -197,6 +205,7 @@ Proof.
   induction eta
     as [ g r i I L
        | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
+       | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
        | g r v i j p q w w' _t P IHP Sh
        | g l l' v i j k p1 q1 p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh
        | g l l' v v' i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
@@ -206,6 +215,7 @@ Proof.
        ].
   - reflexivity.
   - apply le_S. apply IHP.
+  - apply IHP.
   - apply IHP.
   - transitivity j. { apply IHL. } { apply IHP. }
   - transitivity j. { apply IHL. } { apply IHP. }
@@ -224,21 +234,18 @@ Proof.
   induction eta
     as [ g r i I L
        | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
+       | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
        | g r v i j p q w w' _t P IHP Sh
        | g l l' v i j k p1 q1 p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh
        | g l l' v v' i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
        | g l v i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rs Lb
        | g l l' v v' i j k p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh Fv Lb
        | g v u i j k l p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Lb
-       ].
+       ];
+  try (apply IHP);
+  try (apply IHL).
   - rewrite Nat.add_1_r. apply le_S. apply L.
   - rewrite Nat.add_1_r. apply le_n_S. apply L.
-  - apply IHP.
-  - apply IHP.
-  - apply IHP.
-  - apply IHP.
-  - apply IHP.
-  - apply IHL.
 Qed.
 
 
@@ -255,16 +262,17 @@ Proof.
   induction eta
     as [ g r i I L
        | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
+       | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
        | g r v i j p q w w' _t P IHP Sh
        | g l l' v i j k p1 q1 p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh
        | g l l' v v' i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
        | g l v i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rs Lb
        | g l l' v v' i j k p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh Fv Lb
        | g v u i j k l p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Lb
-       ].
+       ];
+  try (apply IHP);
+  try (apply IHL).
   - intros x E. discriminate E.
-  - intros x E. apply IHP in E. apply E.
-  - intros x E. apply IHP in E. apply E.
   - intros x E. destruct p1.
     + simpl in E. apply IHL in E. apply E.
     + simpl in E. apply IHP in E.
@@ -272,8 +280,6 @@ Proof.
       transitivity j.
       * apply E'.
       * apply E.
-  - intros x E. apply IHL in E. apply E.
-  - intros x E. apply IHL in E. apply E.
   - intros x E. injection E as E. rewrite <- E.
     apply item_i_le_j in LP. apply LP.
   - intros x E. apply IHP in E as Le_j_x.
@@ -295,6 +301,7 @@ Proof.
   intros eta.
   induction eta
     as [ g r i I L
+       | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
        | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
        | g r v i j p q w w' _t P IHP Sh
        | g l l' v i j k p1 q1 p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh
@@ -331,6 +338,7 @@ Proof.
   generalize dependent x.
   induction eta
     as [ g r i I L
+       | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
        | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
        | g r v i j p q w w' _t P IHP Sh
        | g l l' v i j k p1 q1 p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh
@@ -376,16 +384,18 @@ Proof.
   induction eta
     as [ g r i I L
        | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
+       | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
        | g r v i j p q w w' _t P IHP Sh
        | g l l' v i j k p1 q1 p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh
        | g l l' v v' i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
        | g l v i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rs Lb
        | g l l' v v' i j k p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh Fv Lb
        | g v u i j k l p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Lb
-       ].
+       ];
+  try (apply IHL);
+  try (apply IHP).
   - intros x E. discriminate E.
   - intros x E. apply IHP in E. apply le_S. apply E.
-  - intros x E. apply IHP in E. apply E.
   - intros x E. destruct q1.
     + simpl in E. apply IHL in E.
       apply item_i_le_j in RP as E'.
@@ -425,19 +435,17 @@ Proof.
   induction eta
     as [ g r i I L
        | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
+       | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
        | g r v i j p q w w' _t P IHP Sh
        | g l l' v i j k p1 q1 p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh
        | g l l' v v' i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
        | g l v i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rs Lb
        | g l l' v v' i j k p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh Fv Lb
        | g v u i j k l p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Lb
-       ].
+       ];
+  try (apply IHP).
 
   - split. apply Rle_refl. apply Rle_refl.
-
-  - apply IHP.
-
-  - apply IHP.
 
   - destruct IHL as [L1 L2].
     destruct IHP as [P1 P2].
@@ -515,6 +523,7 @@ Proof.
   induction eta
     as [ g r i I L
        | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
+       | g r1 r2 i j p q v w w' _t P IHP L Sh Lb
        | g r v i j p q w w' _t P IHP Sh
        | g l l' v i j k p1 q1 p2 q2 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Sh
        | g l l' v v' i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP IHL RP IHP Rv Rs Le Lb Sh
@@ -535,6 +544,11 @@ Proof.
       apply (Rplus_le_compat_r (costs g [j])).
       apply IHP.
     + apply Sh.
+    + apply Lb.
+
+  - (* EM *)
+    apply shift_empty_inf in Sh as InfEq.
+    + simpl. simpl in IHP. rewrite InfEq. apply IHP.
     + apply Lb.
 
   - simpl. simpl in IHP.
@@ -715,6 +729,7 @@ Proof.
   destruct eta
     as [ g r i I L
        | g r1 r2 i j p q v w w' _t P L Sh Lb
+       | g r1 r2 i j p q v w w' _t P L Sh Lb
        | g r v i j p q w w' _t P Sh
        | g l l' v i j k p1 q1 p2 q2 w1 w2 w1' w2' _t1 _t2 LP RP Sh
        | g l l' v v' i j k p1 q1 w1 w2 w1' w2' _t1 _t2 LP RP Rv Rs Le Lb Sh
@@ -748,6 +763,17 @@ Proof.
     rewrite cost_one.
     apply Rplus_le_compat_l.
     apply Rle_refl.
+
+  - (* EM *)
+    unfold total'.
+    apply Rplus_le_compat_l.
+    simpl. unfold heuristic'.
+    apply Rplus_le_compat_r.
+    rewrite <- (Rplus_0_r (_ _ r1)).
+    apply shift_amort_weight in Sh as Sh'. rewrite Sh'.
+    apply Rplus_le_compat.
+    + apply Rle_refl.
+    + apply costs_ge_0.
 
   - (* DE *)
     simpl. unfold total'.
